@@ -1,0 +1,76 @@
+{
+  "phase": "static only",
+  "blender": "5.0.1",
+  "revision": "02 | Lower bean silhouette, smaller eyes and tucked feet",
+  "reference": "public/references/pip-character-reference.png",
+  "objects": [
+    {
+      "object": "Pip.Body",
+      "base_vertices": 1082,
+      "base_faces": 1120,
+      "evaluated_triangles": 8800,
+      "dimensions_xyz": [
+        2.22613,
+        2.5839,
+        1.71429
+      ]
+    },
+    {
+      "object": "Pip.Foot.L",
+      "base_vertices": 610,
+      "base_faces": 640,
+      "evaluated_triangles": 1216,
+      "dimensions_xyz": [
+        0.36,
+        0.51885,
+        0.28274
+      ]
+    },
+    {
+      "object": "Pip.Foot.R",
+      "base_vertices": 610,
+      "base_faces": 640,
+      "evaluated_triangles": 1216,
+      "dimensions_xyz": [
+        0.36,
+        0.51885,
+        0.28274
+      ]
+    },
+    {
+      "object": "Pip.Eye.L",
+      "base_vertices": 362,
+      "base_faces": 384,
+      "evaluated_triangles": 720,
+      "dimensions_xyz": [
+        0.17125,
+        0.11323,
+        0.30353
+      ]
+    },
+    {
+      "object": "Pip.Eye.R",
+      "base_vertices": 362,
+      "base_faces": 384,
+      "evaluated_triangles": 720,
+      "dimensions_xyz": [
+        0.17125,
+        0.11323,
+        0.30353
+      ]
+    }
+  ],
+  "total_evaluated_triangles": 12672,
+  "materials": 2,
+  "texture_images": 0,
+  "armatures": 0,
+  "animations": 0,
+  "shape_keys": 0,
+  "dimensions_xyz": [
+    2.22613,
+    2.5839,
+    1.74434
+  ],
+  "geometry_checks": "Base and evaluated shells are closed manifold; finite coordinates, consistent outward normals, no degenerate faces",
+  "note": "Body and feet are separate intersecting closed shells with hidden roots."
+}
