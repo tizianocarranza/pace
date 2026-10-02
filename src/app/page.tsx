@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { useTypingEngine } from "@/hooks/useTypingEngine";
 import { Runner } from "@/components/runner/Runner";
-
-const TEXT =
-  "Small daily"; /* actions often lead to remarkable results over time." */
+import { getRandomPrompt, PROMPTS } from "@/data/prompts";
 
 export default function Home() {
+  const [text, setText] = useState<string>(PROMPTS[0]);
   const [showResults, setShowResults] = useState(false);
+
   const {
     currentIndex,
     currentWpm,
@@ -21,7 +21,7 @@ export default function Home() {
     handleKey,
     reset,
   } = useTypingEngine({
-    text: TEXT,
+    text: text,
   });
 
   useEffect(() => {
@@ -38,6 +38,7 @@ export default function Home() {
 
   const handleTryAgain = () => {
     setShowResults(false);
+    setText((currentText) => getRandomPrompt(currentText));
     reset();
   };
 
@@ -51,7 +52,7 @@ export default function Home() {
         {!showResults ? (
           <p className="w-[min(48rem,80vw)] text-center text-[clamp(1.6rem,2.5vw,2.75rem)] leading-[1.2] font-normal tracking-[-0.035em]">
             <span className="text-[#171715]">
-              {TEXT.slice(0, currentIndex)}
+              {text.slice(0, currentIndex)}
             </span>
 
             <span className="relative">
@@ -62,7 +63,7 @@ export default function Home() {
                 />
               )}
 
-              <span className="text-[#d7d7d3]">{TEXT.slice(currentIndex)}</span>
+              <span className="text-[#d7d7d3]">{text.slice(currentIndex)}</span>
             </span>
           </p>
         ) : (
