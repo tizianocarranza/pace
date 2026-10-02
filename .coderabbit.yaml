@@ -1,0 +1,23 @@
+language: "en-US"
+
+reviews:
+  profile: "chill"
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+
+  path_instructions:
+    - path: "src/components/runner/**"
+      instructions: >
+        Pay special attention to Three.js and React Three Fiber lifecycle,
+        animation state, refs, frame-loop performance, and cleanup.
+
+    - path: "src/hooks/**"
+      instructions: >
+        Review hooks for stale closures, unnecessary renders, timer cleanup,
+        state consistency, and correct React hook dependencies.
