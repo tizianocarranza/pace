@@ -10,9 +10,10 @@ type PipProps = {
   intensity: number;
   errorCount: number;
   status: "idle" | "running" | "finished";
+  onFinishExit?: () => void;
 };
 
-export function Pip({ intensity, errorCount, status }: PipProps) {
+export function Pip({ intensity, errorCount, status, onFinishExit }: PipProps) {
   const group = useRef<THREE.Group>(null);
   const body = useRef<THREE.Mesh | null>(null);
 
@@ -23,6 +24,7 @@ export function Pip({ intensity, errorCount, status }: PipProps) {
   const activeAnimation = useRef<"Idle" | "Run" | null>(null);
   const rotationGroup = useRef<THREE.Group>(null);
   const runPhase = useRef(0);
+  const hasFinishedExit = useRef(false);
 
   const { scene, animations } = useGLTF("/models/pip.glb");
   const { actions, mixer } = useAnimations(animations, group);
@@ -98,6 +100,33 @@ export function Pip({ intensity, errorCount, status }: PipProps) {
     stumble.reset().fadeIn(0.1).play();
   }, [errorCount, actions]);
 
+  useEffect(() => {
+    if (status !== "idle") return;
+
+    if (rotationGroup.current) {
+      rotationGroup.current.position.set(0, 0, 0);
+      rotationGroup.current.rotation.set(0, 0, 0);
+    }
+
+    visualIntensity.current = 0;
+    targetIntensity.current = 0;
+    runPhase.current = 0;
+    isStumbling.current = false;
+    hasFinishedExit.current = false;
+
+    const idle = actions.Idle;
+    const run = actions.Run;
+    const stumble = actions.Stumble;
+
+    run?.stop();
+    stumble?.stop();
+
+    if (idle) {
+      idle.reset().play();
+      activeAnimation.current = "Idle";
+    }
+  }, [status, actions]);
+
   useFrame((_, delta) => {
     const smoothing = 1 - Math.exp(-5 * delta);
 
@@ -111,6 +140,8 @@ export function Pip({ intensity, errorCount, status }: PipProps) {
     const idle = actions.Idle;
     const run = actions.Run;
 
+    // Run phase is useful both during the game
+    // and during the finish transition.
     if (run && run.isRunning()) {
       const duration = run.getClip().duration;
 
@@ -119,52 +150,82 @@ export function Pip({ intensity, errorCount, status }: PipProps) {
       }
     }
 
-    if (rotationGroup.current) {
-      const targetRotation = status === "idle" ? 0 : Math.PI / 3;
+    if (status === "finished") {
+      if (rotationGroup.current && run) {
+        if (!run.isRunning()) {
+          actions.Idle?.fadeOut(0.1);
+          actions.Stumble?.fadeOut(0.1);
 
-      rotationGroup.current.rotation.y = THREE.MathUtils.damp(
-        rotationGroup.current.rotation.y,
-        targetRotation,
-        4,
-        delta,
-      );
+          run.reset().fadeIn(0.1).play();
+          activeAnimation.current = "Run";
+        }
 
-      // Pip se separa ligeramente del suelo a medida
-      // que aumenta su velocidad.
-      const targetHeight = THREE.MathUtils.lerp(0, 0.2, speed);
+        run.timeScale = THREE.MathUtils.damp(run.timeScale, 2.8, 4, delta);
 
-      rotationGroup.current.position.y = THREE.MathUtils.damp(
-        rotationGroup.current.position.y,
-        targetHeight,
-        5,
-        delta,
-      );
-    }
+        rotationGroup.current.rotation.y = THREE.MathUtils.damp(
+          rotationGroup.current.rotation.y,
+          Math.PI / 3,
+          5,
+          delta,
+        );
 
-    if (!isStumbling.current && idle && run) {
-      const nextAnimation =
-        activeAnimation.current === "Run"
-          ? speed < 0.01
-            ? "Idle"
-            : "Run"
-          : speed > 0.04
-            ? "Run"
-            : "Idle";
+        rotationGroup.current.position.x += 5 * delta;
 
-      if (activeAnimation.current !== nextAnimation) {
-        const previous = activeAnimation.current === "Run" ? run : idle;
+        if (
+          rotationGroup.current.position.x > 5 &&
+          !hasFinishedExit.current
+        ) {
+          hasFinishedExit.current = true;
+          onFinishExit?.();
+        }
+      }
+    } else {
+      if (rotationGroup.current) {
+        const targetRotation = status === "idle" ? 0 : Math.PI / 3;
 
-        const next = nextAnimation === "Run" ? run : idle;
+        rotationGroup.current.rotation.y = THREE.MathUtils.damp(
+          rotationGroup.current.rotation.y,
+          targetRotation,
+          4,
+          delta,
+        );
 
-        previous.fadeOut(0.2);
-        next.reset().fadeIn(0.2).play();
+        const targetHeight = THREE.MathUtils.lerp(0, 0.2, speed);
 
-        activeAnimation.current = nextAnimation;
+        rotationGroup.current.position.y = THREE.MathUtils.damp(
+          rotationGroup.current.position.y,
+          targetHeight,
+          5,
+          delta,
+        );
       }
 
-      run.timeScale = THREE.MathUtils.lerp(0.55, 2.25, speed);
+      if (!isStumbling.current && idle && run) {
+        const nextAnimation =
+          activeAnimation.current === "Run"
+            ? speed < 0.01
+              ? "Idle"
+              : "Run"
+            : speed > 0.04
+              ? "Run"
+              : "Idle";
+
+        if (activeAnimation.current !== nextAnimation) {
+          const previous = activeAnimation.current === "Run" ? run : idle;
+
+          const next = nextAnimation === "Run" ? run : idle;
+
+          previous.fadeOut(0.2);
+          next.reset().fadeIn(0.2).play();
+
+          activeAnimation.current = nextAnimation;
+        }
+
+        run.timeScale = THREE.MathUtils.lerp(0.55, 2.25, speed);
+      }
     }
 
+    // Morph remains active during the finish transition.
     const mesh = body.current;
     const stretchIndex = mesh?.morphTargetDictionary?.Stretch;
 
