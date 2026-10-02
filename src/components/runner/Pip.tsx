@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { PipShadow } from "./PipShadow";
+import { SpeedLines } from "./SpeedLines";
 
 type PipProps = {
   intensity: number;
@@ -171,10 +172,7 @@ export function Pip({ intensity, errorCount, status, onFinishExit }: PipProps) {
 
         rotationGroup.current.position.x += 5 * delta;
 
-        if (
-          rotationGroup.current.position.x > 5 &&
-          !hasFinishedExit.current
-        ) {
+        if (rotationGroup.current.position.x > 5 && !hasFinishedExit.current) {
           hasFinishedExit.current = true;
           onFinishExit?.();
         }
@@ -236,6 +234,14 @@ export function Pip({ intensity, errorCount, status, onFinishExit }: PipProps) {
 
   return (
     <group>
+      <SpeedLines
+        intensity={status === "idle" ? 0 : status === "finished" ? 1 : intensity}
+        active={status !== "idle"}
+        origin={rotationGroup}
+        runPhase={runPhase}
+        isStumbling={isStumbling}
+      />
+
       <PipShadow intensity={intensity} runPhase={runPhase} />
 
       <group ref={rotationGroup}>
