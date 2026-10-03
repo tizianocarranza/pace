@@ -28,8 +28,8 @@ export function Runner({
           camera.lookAt(0, 0, 0);
         }}
       >
-        <ambientLight intensity={1.8} />
-        <directionalLight position={[3, 4, 5]} intensity={2} />
+        <ambientLight intensity={1.65} />
+        <directionalLight position={[3, 4, 5]} intensity={2.1} />
 
         <Pip
           intensity={intensity}

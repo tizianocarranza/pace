@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { PipShadow } from "./PipShadow";
 import { SpeedLines } from "./SpeedLines";
+import { usePipSurface } from "./usePipSurface";
 
 type PipProps = {
   intensity: number;
@@ -29,6 +30,7 @@ export function Pip({ intensity, errorCount, status, onFinishExit }: PipProps) {
 
   const { scene, animations } = useGLTF("/models/pip.glb");
   const { actions, mixer } = useAnimations(animations, group);
+  usePipSurface(scene);
 
   useEffect(() => {
     targetIntensity.current = intensity;
@@ -242,7 +244,7 @@ export function Pip({ intensity, errorCount, status, onFinishExit }: PipProps) {
         isStumbling={isStumbling}
       />
 
-      <PipShadow intensity={intensity} runPhase={runPhase} />
+      <PipShadow model={scene} />
 
       <group ref={rotationGroup}>
         <Center>
