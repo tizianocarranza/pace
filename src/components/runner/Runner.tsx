@@ -5,6 +5,7 @@ import { Pip } from "./Pip";
 
 type RunnerProps = {
   intensity: number;
+  lastCorrectAt: number | null;
   errorCount: number;
   status: "idle" | "running" | "finished";
   onFinishExit?: () => void;
@@ -12,6 +13,7 @@ type RunnerProps = {
 };
 export function Runner({
   intensity,
+  lastCorrectAt,
   errorCount,
   status,
   onFinishExit,
@@ -33,6 +35,7 @@ export function Runner({
 
         <Pip
           intensity={intensity}
+          lastCorrectAt={lastCorrectAt}
           errorCount={errorCount}
           status={status}
           onFinishExit={onFinishExit}

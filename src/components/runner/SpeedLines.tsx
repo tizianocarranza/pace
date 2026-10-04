@@ -1,16 +1,15 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { type RefObject, useEffect, useMemo, useRef } from "react";
+import { type RefObject, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { PIP_FLOOR_Y, type FootContact } from "./pipContacts";
+import { type PipMotionRef } from "./usePipMotion";
 
 type SpeedLinesProps = {
-  intensity: number;
-  active?: boolean;
+  motion: PipMotionRef;
   /** Used for silhouette clearance and foot contacts, never to anchor the air. */
   origin?: RefObject<THREE.Group | null>;
-  runPhase: RefObject<number>;
-  isStumbling?: RefObject<boolean>;
 };
 
 const AIR_SLOTS = 3;
@@ -36,7 +35,7 @@ type Passage = {
 type Simulation = {
   seed: number;
   speed: number;
-  previousPhase: number;
+  contactSequences: [number, number];
   wasActive: boolean;
   nextFoot: number;
   passages: Passage[];
@@ -46,7 +45,7 @@ function createSimulation(): Simulation {
   return {
     seed: 73129,
     speed: 0,
-    previousPhase: 0,
+    contactSequences: [0, 0],
     wasActive: false,
     nextFoot: AIR_SLOTS,
     passages: Array.from({ length: SLOT_COUNT }, (_, index) => ({
@@ -100,19 +99,18 @@ function startPassage(
   }
 }
 
-function footContact(simulation: Simulation, x: number, foot: number) {
+function footContact(simulation: Simulation, foot: FootContact) {
   const passage = simulation.passages[simulation.nextFoot];
   simulation.nextFoot = AIR_SLOTS + (simulation.nextFoot - AIR_SLOTS + 1) % FOOT_SLOTS;
   passage.progress = 0;
   passage.rate = 1 / (0.32 + random(simulation) * 0.16);
-  // Record X at contact, on the existing shadow's ground plane. Pip's body
-  // bobs above it; the contact must neither bob with him nor follow his exit.
-  passage.x = x + (foot === 0 ? 0.04 : 0.48) + (random(simulation) - 0.5) * 0.08;
-  passage.y = -1.50;
-  passage.z = -0.3;
+  // Capture the actual landing location once, then let the accent drift away.
+  passage.x = foot.point.x + (random(simulation) - 0.5) * 0.04;
+  passage.y = PIP_FLOOR_Y + 0.015;
+  passage.z = foot.point.z;
   passage.length = 0.10 + random(simulation) * 0.06;
   passage.width = 0.035 + random(simulation) * 0.015;
-  passage.opacity = 0.19 + random(simulation) * 0.04;
+  passage.opacity = (0.16 + random(simulation) * 0.04) * foot.impact;
   passage.bend = 0;
 }
 
@@ -209,16 +207,12 @@ function createGeometryData() {
 }
 
 export function SpeedLines({
-  intensity,
-  active = true,
+  motion,
   origin,
-  runPhase,
-  isStumbling,
 }: SpeedLinesProps) {
   const mesh = useRef<THREE.Mesh>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
   const simulation = useRef<Simulation | null>(null);
-  const reducedMotion = useRef(false);
   const data = useMemo(() => createGeometryData(), []);
   const uniforms = useMemo(
     () => ({
@@ -231,25 +225,15 @@ export function SpeedLines({
     [],
   );
 
-  useEffect(() => {
-    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => {
-      reducedMotion.current = preference.matches;
-    };
-    update();
-    preference.addEventListener("change", update);
-    return () => preference.removeEventListener("change", update);
-  }, []);
-
   useFrame((state, delta) => {
     if (!material.current || !mesh.current) return;
     const sim = simulation.current ?? (simulation.current = createSimulation());
     const live = material.current.uniforms;
     const positions = live.uPositions.value as THREE.Vector4[];
     const shapes = live.uShapes.value as THREE.Vector4[];
-    const phase = runPhase.current;
+    const movement = motion.current;
 
-    if (!active) {
+    if (!movement?.active) {
       if (sim.wasActive) {
         for (let index = 0; index < SLOT_COUNT; index++) {
           sim.passages[index].progress = -1;
@@ -259,29 +243,31 @@ export function SpeedLines({
       }
       sim.wasActive = false;
       sim.speed = 0;
-      sim.previousPhase = phase;
+      sim.contactSequences[0] = movement?.contacts.feet[0].sequence ?? 0;
+      sim.contactSequences[1] = movement?.contacts.feet[1].sequence ?? 0;
       live.uStrength.value = 0;
       mesh.current.visible = false;
       return;
     }
     sim.wasActive = true;
     const dt = Math.min(delta, 0.05);
-    const target = reducedMotion.current || !Number.isFinite(intensity)
-      ? 0
-      : THREE.MathUtils.clamp(intensity, 0, 1);
-    sim.speed = THREE.MathUtils.damp(sim.speed, target, target > sim.speed ? 4 : 6, dt);
-    const strength = Math.pow(THREE.MathUtils.smoothstep(sim.speed, 0.15, 1), 2.4);
+    // The field shares Pip's inertia and error recovery, rather than smoothing
+    // the WPM a second time and falling out of sync with his motion.
+    sim.speed = movement.speed;
+    const strength = movement.reducedMotion ? 0
+      : Math.pow(THREE.MathUtils.smoothstep(sim.speed, 0.15, 1), 2.4) * (1 - movement.stumble * 0.6);
     const pipX = origin?.current?.position.x ?? 0;
     const pipY = origin?.current?.position.y ?? 0;
     live.uPipPosition.value.set(pipX, pipY);
     live.uStrength.value = strength;
 
-    // Contact crossings, not a free-running timer: a frozen/stumbling run emits nothing.
-    if (strength > 0.0001 && !isStumbling?.current) {
-      if (sim.previousPhase < 0.5 && phase >= 0.5) footContact(sim, pipX, 1);
-      else if (phase < sim.previousPhase) footContact(sim, pipX, 0);
+    for (let index = 0; index < 2; index++) {
+      const foot = movement.contacts.feet[index];
+      if (foot.sequence !== sim.contactSequences[index]) {
+        if (strength > 0.0001 && foot.impact > 0) footContact(sim, foot);
+        sim.contactSequences[index] = foot.sequence;
+      }
     }
-    sim.previousPhase = phase;
 
     let movingAir = 0;
     for (let index = 0; index < AIR_SLOTS; index++) {

@@ -132,6 +132,14 @@ export function useTypingEngine({ text }: UseTypingEngineOptions) {
 
   const intensity = Math.min(currentWpm / MAX_WPM, 1);
 
+  // A visual-only intent signal. WPM, accuracy and completion retain their rules.
+  const lastCorrectAt = useMemo(() => {
+    for (let index = keystrokes.length - 1; index >= 0; index--) {
+      if (keystrokes[index].correct) return keystrokes[index].timestamp;
+    }
+    return null;
+  }, [keystrokes]);
+
   const status: "idle" | "finished" | "running" =
     currentIndex === 0
       ? "idle"
@@ -146,6 +154,7 @@ export function useTypingEngine({ text }: UseTypingEngineOptions) {
     averageWpm,
     accuracy,
     intensity,
+    lastCorrectAt,
     status,
     errorCount,
     handleKey,
