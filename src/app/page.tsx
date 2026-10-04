@@ -15,6 +15,7 @@ export default function Home() {
     accuracy,
     status,
     intensity,
+    lastCorrectAt,
     errorCount,
     averageWpm,
     elapsedTime,
@@ -100,6 +101,7 @@ export default function Home() {
       <section className="flex flex-col items-center justify-center gap-6">
         <Runner
           intensity={intensity}
+          lastCorrectAt={lastCorrectAt}
           errorCount={errorCount}
           status={status}
           onFinishExit={() => setShowResults(true)}
