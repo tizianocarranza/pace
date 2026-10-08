@@ -12,7 +12,6 @@ type UseTypingEngineOptions = {
 };
 
 const WPM_WINDOW = 4_000;
-const MAX_WPM = 120;
 
 export function useTypingEngine({ text }: UseTypingEngineOptions) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -130,8 +129,6 @@ export function useTypingEngine({ text }: UseTypingEngineOptions) {
       ? 100
       : Math.round((correctCharacters.current / totalCharacters.current) * 100);
 
-  const intensity = Math.min(currentWpm / MAX_WPM, 1);
-
   // A visual-only intent signal. WPM, accuracy and completion retain their rules.
   const lastCorrectAt = useMemo(() => {
     for (let index = keystrokes.length - 1; index >= 0; index--) {
@@ -153,7 +150,6 @@ export function useTypingEngine({ text }: UseTypingEngineOptions) {
     elapsedTime,
     averageWpm,
     accuracy,
-    intensity,
     lastCorrectAt,
     status,
     errorCount,
