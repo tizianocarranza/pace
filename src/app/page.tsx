@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useTypingEngine } from "@/hooks/useTypingEngine";
 import { Runner } from "@/components/runner/Runner";
 import { getRandomPrompt, PROMPTS } from "@/data/prompts";
+import { resolveVisualSpeed } from "@/lib/visualSpeed";
+
+const WpmSimulator = process.env.NODE_ENV === "development"
+  ? lazy(() => import("@/components/debug/WpmSimulator")) : null;
 
 export default function Home() {
   const [text, setText] = useState<string>(PROMPTS[0]);
   const [showResults, setShowResults] = useState(false);
+  const [simulatedWpm, setSimulatedWpm] = useState<number | null>(null);
 
   const {
     currentIndex,
     currentWpm,
     accuracy,
     status,
-    intensity,
     lastCorrectAt,
     errorCount,
     averageWpm,
@@ -24,6 +28,9 @@ export default function Home() {
   } = useTypingEngine({
     text: text,
   });
+
+  const visualSpeed = resolveVisualSpeed(currentWpm, status,
+    process.env.NODE_ENV === "development" ? simulatedWpm : null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -44,7 +51,7 @@ export default function Home() {
   };
 
   return (
-    <main className="grid min-h-screen grid-rows-[auto_1fr_1fr] bg-white px-12 py-8 text-[#171715] max-sm:px-6 max-sm:py-6">
+    <main className="isolate grid min-h-screen grid-rows-[auto_1fr_1fr] bg-white px-12 py-8 text-[#171715] max-sm:px-6 max-sm:py-6">
       <header className="flex items-center justify-between">
         <span className="text-base font-medium tracking-[-0.04em]">pace.</span>
       </header>
@@ -100,10 +107,11 @@ export default function Home() {
 
       <section className="flex flex-col items-center justify-center gap-6">
         <Runner
-          intensity={intensity}
+          intensity={visualSpeed.intensity}
+          sustainedInput={visualSpeed.sustainedInput}
           lastCorrectAt={lastCorrectAt}
           errorCount={errorCount}
-          status={status}
+          status={visualSpeed.status}
           onFinishExit={() => setShowResults(true)}
           className="h-48 w-screen"
         />
@@ -118,6 +126,11 @@ export default function Home() {
           </div>
         )}
       </section>
+      {WpmSimulator && (
+        <Suspense fallback={null}>
+          <WpmSimulator value={simulatedWpm} onChange={setSimulatedWpm} finished={status === "finished"} />
+        </Suspense>
+      )}
     </main>
   );
 }

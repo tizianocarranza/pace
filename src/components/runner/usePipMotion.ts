@@ -16,6 +16,7 @@ export function usePipMotion(
   errorCount: number,
   status: PipStatus,
   onFinishExit?: () => void,
+  sustainedInput = false,
 ) {
   const controller = useRef<PipMotion | null>(null);
   const signals = useRef<PipMotionSignals | null>(null);
@@ -41,7 +42,11 @@ export function usePipMotion(
   // Negative priority preserves R3F's automatic rendering.
   useFrame((state, delta) => {
     const finished = controller.current?.update(
-      delta, intensity, lastCorrectAt, errorCount, status, Date.now(), state.camera, state.viewport.width,
+      delta, intensity, lastCorrectAt, errorCount, status, Date.now(), state.camera,
+      // R3F's viewport estimate ignores camera view offsets. Read the horizontal
+      // projection so extending the studio upward preserves the exit velocity.
+      2 * state.camera.position.length() / state.camera.projectionMatrix.elements[0],
+      sustainedInput,
     );
     if (finished) onFinishExit?.();
   }, -1);

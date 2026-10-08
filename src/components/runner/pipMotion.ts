@@ -3,10 +3,12 @@ import { createContacts, createContactSampler, resetContacts, type PipContacts }
 
 export type PipStatus = "idle" | "running" | "finished";
 export type PipMotionSignals = {
+  intent: number;
   speed: number;
   acceleration: number;
   locomotion: number;
   stumble: number;
+  stumbleSequence: number;
   active: boolean;
   reducedMotion: boolean;
   contacts: PipContacts;
@@ -32,7 +34,7 @@ function springStep(spring: Spring, delta: number) {
 /** Owns visual motion only. Scoring and the typing engine never depend on it. */
 export class PipMotion {
   readonly signals: PipMotionSignals = {
-    speed: 0, acceleration: 0, locomotion: 0, stumble: 0,
+    intent: 0, speed: 0, acceleration: 0, locomotion: 0, stumble: 0, stumbleSequence: 0,
     active: false, reducedMotion: false, contacts: createContacts(),
   };
   private readonly mixer: THREE.AnimationMixer;
@@ -90,8 +92,9 @@ export class PipMotion {
     this.exitVelocity = 0;
     this.exited = false;
     this.compression.value = this.compression.velocity = 0;
-    this.signals.speed = this.signals.acceleration = this.signals.locomotion = this.signals.stumble = 0;
+    this.signals.intent = this.signals.speed = this.signals.acceleration = this.signals.locomotion = this.signals.stumble = 0;
     this.signals.active = false;
+    this.signals.stumbleSequence = 0;
     this.placement.position.set(0, 0, 0);
     this.placement.rotation.set(0, 0, 0);
     this.placement.visible = true;
@@ -108,6 +111,7 @@ export class PipMotion {
     now: number,
     camera: THREE.Camera,
     viewportWidth: number,
+    sustainedInput = false,
   ): boolean {
     const dt = THREE.MathUtils.clamp(delta, 0, 0.05);
     if (dt === 0) return false;
@@ -129,6 +133,7 @@ export class PipMotion {
 
     if (errors > this.previousErrors && status !== "finished") {
       if (!this.stumbling) {
+        motion.stumbleSequence++;
         this.stumble.reset().setEffectiveTimeScale(1.4).play();
         this.stumbling = true;
         motion.speed *= 0.72;
@@ -149,10 +154,12 @@ export class PipMotion {
     motion.stumble = stumbleEnvelope;
 
     const input = Number.isFinite(intensity) ? THREE.MathUtils.clamp(intensity, 0, 1) : 0;
-    const age = lastCorrectAt === null ? Infinity : Math.max(0, (now - lastCorrectAt) / 1000);
+    const age = sustainedInput ? 0 : lastCorrectAt === null ? Infinity : Math.max(0, (now - lastCorrectAt) / 1000);
     const grace = THREE.MathUtils.lerp(0.95, 0.38, input);
     // WPM remains a four-second statistic. Visual intent starts coasting sooner.
     const intent = input * Math.exp(-Math.max(0, age - grace) * 3.2);
+    // Environment momentum consumes typing intent before the character-only stumble response.
+    motion.intent = status === "finished" ? 1 : status === "idle" ? 0 : intent;
     const target = status === "finished" ? 1 : status === "idle" ? 0
       : intent * (1 - stumbleEnvelope * 0.55);
     const previousSpeed = motion.speed;
@@ -184,11 +191,12 @@ export class PipMotion {
     if (this.bodyBone) {
       // The animated body pivot leaves the feet planted. The mixer restores
       // its authored rotation each frame before these small additions.
-      this.bodyBone.rotateX((motion.speed * 0.045 + acceleration * 0.018) * reduced * (1 - stumbleEnvelope));
+      this.bodyBone.rotateX((motion.speed * 0.045 + acceleration * 0.028) * reduced * (1 - stumbleEnvelope));
     }
     if (this.body?.morphTargetInfluences) {
       if (this.squashIndex !== undefined) {
-        this.body.morphTargetInfluences[this.squashIndex] = Math.min(0.18, compression);
+        this.body.morphTargetInfluences[this.squashIndex] = Math.min(0.18,
+          compression + Math.max(0, -acceleration) * 0.012 * reduced * (1 - stumbleEnvelope));
       }
       if (this.stretchIndex !== undefined) {
         this.body.morphTargetInfluences[this.stretchIndex] = reduced * (1 - stumbleEnvelope)

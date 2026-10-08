@@ -8,6 +8,7 @@ export type FootContact = {
   height: number;
   previousHeight: number;
   armed: boolean;
+  grounded: boolean;
   impact: number;
   sequence: number;
 };
@@ -20,7 +21,7 @@ export type PipContacts = {
 export function createContacts(): PipContacts {
   const foot = (): FootContact => ({
     point: new THREE.Vector3(), height: 0, previousHeight: 0,
-    armed: false, impact: 0, sequence: 0,
+    armed: false, grounded: true, impact: 0, sequence: 0,
   });
   return { ready: false, feet: [foot(), foot()] };
 }
@@ -29,6 +30,7 @@ export function resetContacts(contacts: PipContacts) {
   contacts.ready = false;
   for (const foot of contacts.feet) {
     foot.armed = false;
+    foot.grounded = true;
     foot.impact = 0;
     foot.sequence = 0;
   }
@@ -58,13 +60,18 @@ export function createContactSampler(model: THREE.Group) {
       sample.mesh.getVertexPosition(sample.vertex, foot.point);
       foot.point.applyMatrix4(sample.mesh.matrixWorld);
       foot.height = Math.max(0, foot.point.y - PIP_FLOOR_Y);
+      const releaseHeight = 0.014 + locomotion * 0.025;
+      const contactHeight = 0.011 + locomotion * 0.012;
+      if (!wasReady) foot.grounded = foot.height < contactHeight;
+      else if (foot.height > releaseHeight) foot.grounded = false;
+      else if (foot.height < contactHeight) foot.grounded = true;
       foot.impact = 0;
       if (!wasReady || !allowImpact) {
         foot.armed = false;
       } else {
         // Hysteresis prevents grazing/idle breathing from firing more contacts.
-        if (foot.height > 0.014 + locomotion * 0.025) foot.armed = true;
-        if (foot.armed && foot.height < 0.011 + locomotion * 0.012
+        if (foot.height > releaseHeight) foot.armed = true;
+        if (foot.armed && foot.grounded
           && foot.height < foot.previousHeight) {
           const downwardSpeed = (foot.previousHeight - foot.height) / Math.max(delta, 0.001);
           foot.impact = THREE.MathUtils.clamp(0.25 + downwardSpeed * 0.8, 0.25, 1);
