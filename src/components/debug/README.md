@@ -10,8 +10,8 @@ The override is also ignored at the page's signal boundary in production.
 Keyboard events inside the panel do not reach the typing handler.
 
 `src/lib/visualSpeed.ts` resolves real/simulated WPM and applies the single
-curve: `clamp(wpm / 65, 0, 1) ** 0.75`. At 15/30/45/60 WPM this produces
-approximately 33/56/76/94% intensity; 65 WPM reaches full intensity and higher
+curve: `clamp(wpm / 90, 0, 1) ** 0.6`. At 15/30/45/60 WPM this produces
+approximately 34/52/66/78% intensity; 90 WPM reaches full intensity and higher
 speeds remain capped. Future visual systems should consume this resolved signal.
 
 Simulation holds visual input active in the existing Pip controller. It does

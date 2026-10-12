@@ -9,6 +9,8 @@ import { frameComposition, type CompositionStudy } from "./composition";
 import { CompositionContext, useCompositionSelection } from "./CompositionStudy";
 import { MaterialStudyContext, MaterialStudyControls, useMaterialSelection } from "./MaterialStudy";
 import { StudioEnvironment } from "./environment/StudioEnvironment";
+import { AtmosphereContext, AtmosphereControls, useAtmosphereSelection } from "./AtmosphereStudy";
+import { EnergyControls } from "./EnergyStudy";
 
 type RunnerProps = {
   intensity: number;
@@ -47,6 +49,7 @@ export function Runner({
 }: RunnerProps) {
   const composition = useCompositionSelection();
   const materialMode = useMaterialSelection();
+  const atmosphere = useAtmosphereSelection();
   return (
     <div className={`relative ${className ?? ""}`} style={{ width: "100%" }}>
       <div className="pointer-events-none fixed inset-0 -z-10">
@@ -61,23 +64,27 @@ export function Runner({
         >
           <CompositionContext.Provider value={composition}>
             <MaterialStudyContext.Provider value={materialMode}>
-              <StudioFraming study={composition.study} />
-              <StudioEnvironment />
-              <EnvironmentLighting />
+              <AtmosphereContext.Provider value={atmosphere}>
+                <StudioFraming study={composition.study} />
+                <StudioEnvironment />
+                <EnvironmentLighting />
 
-              <Pip
-                intensity={intensity}
-                sustainedInput={sustainedInput}
-                lastCorrectAt={lastCorrectAt}
-                errorCount={errorCount}
-                status={status}
-                onFinishExit={onFinishExit}
-              />
+                <Pip
+                  intensity={intensity}
+                  sustainedInput={sustainedInput}
+                  lastCorrectAt={lastCorrectAt}
+                  errorCount={errorCount}
+                  status={status}
+                  onFinishExit={onFinishExit}
+                />
+              </AtmosphereContext.Provider>
             </MaterialStudyContext.Provider>
           </CompositionContext.Provider>
         </Canvas>
       </div>
       <MaterialStudyControls mode={materialMode} />
+      <AtmosphereControls mode={atmosphere} />
+      <EnergyControls />
     </div>
   );
 }

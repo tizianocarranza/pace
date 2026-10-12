@@ -20,14 +20,15 @@ export class WorldEnergy {
       return;
     }
     const intensity = MathUtils.clamp(world.intensity, 0, 1);
-    const target = intensity * intensity;
+    // Quiet at low speed, established at 60, with restrained remaining headroom.
+    const target = MathUtils.smoothstep(intensity, 0.2, 1);
     const energy = this.value;
     energy.x = MathUtils.damp(energy.x, target, target > energy.x ? 3.2 : 2.2, dt);
-    energy.y = MathUtils.damp(energy.y, target * target, 0.65, dt);
+    energy.y = MathUtils.damp(energy.y, target * target, target > energy.y ? 0.9 : 1.1, dt);
     energy.z = MathUtils.damp(energy.z, Math.max(0, intensity - world.lag), 5, dt);
     energy.w = interrupted ? 1 : MathUtils.damp(energy.w, 0, 3.6, dt);
     // All light paths use this clock. Travel still comes from the physical world.
-    this.phase = (this.phase + dt * (0.13 + world.velocity * 0.065)) % (Math.PI * 2);
+    this.phase = (this.phase + dt * (world.velocity * 0.095)) % (Math.PI * 2);
   }
 }
 
@@ -41,6 +42,10 @@ export const energyField = /* glsl */ `
   }
   float energySweep(vec3 point) {
     float phase = point.x * 0.48 + point.z * 0.24 + point.y * 0.7 + uEnergyPhase * 2.0;
-    return pow(0.5 + 0.5 * sin(phase), 10.0);
+    // Overlapping broad catches sustain surface response through traversal,
+    // rather than a brief synchronized flash followed by a long empty interval.
+    float first = pow(0.5 + 0.5 * sin(phase), 6.0);
+    float second = pow(0.5 + 0.5 * sin(point.x * 0.66 + point.z * 0.64 + point.y * 0.96 + uEnergyPhase * 3.0 + 2.1), 8.0);
+    return min(1.0, first * 0.72 + second * 0.48);
   }
 `;

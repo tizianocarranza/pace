@@ -14,6 +14,7 @@ for (const [name, file] of [
   ['landscape', 'src/components/runner/environment/landscape.ts'],
   ['worldLighting', 'src/components/runner/environment/worldLighting.ts'],
   ['landscapeShaders', 'src/components/runner/environment/landscapeShaders.ts'],
+  ['atmosphere', 'src/components/runner/environment/atmosphere.ts'],
   ['landscapeMaterials', 'src/components/runner/environment/landscapeMaterials.ts'],
   ['detailClusters', 'src/components/runner/environment/detailClusters.ts'],
   ['worldMotion', 'src/components/runner/environment/worldMotion.ts'],
@@ -29,9 +30,9 @@ for (const [name, file] of [
   });
   await fs.writeFile(path.join(compiled, `${name}.mjs`), outputText
     .replace('"../pipContacts"', '"./pipContacts.mjs"')
-    .replace(/"\.\/(landscape|landscapeShaders|worldLighting|terrainProfile|worldMotion|worldInteractions|worldEnergy)"/g, '"./$1.mjs"'));
+    .replace(/"\.\/(landscape|landscapeShaders|worldLighting|terrainProfile|worldMotion|worldInteractions|worldEnergy|atmosphere)"/g, '"./$1.mjs"'));
 }
-const { LandscapeMotion, FORMATIONS, WORLD_PERIOD, GROUND_Y, terrainHeight, createTerrain, createFormation, createNearBank } =
+const { LandscapeMotion, FORMATIONS, FORMATION_HEIGHT_SCALE, WORLD_PERIOD, GROUND_Y, terrainHeight, createTerrain, createFormation, createNearBank } =
   await import(pathToFileURL(path.join(compiled, 'landscape.mjs')));
 const { PIP_FLOOR_Y } = await import(pathToFileURL(path.join(compiled, 'pipContacts.mjs')));
 const { createLandscapeMaterials } = await import(pathToFileURL(path.join(compiled, 'landscapeMaterials.mjs')));
@@ -131,8 +132,28 @@ FORMATIONS.forEach((form, index) => {
       for (let row = 0; row <= 24; row++) for (const end of [0, 64]) {
         const at = (layer * layerVertices + row * 65 + end) * 3;
         const ground = terrainHeight(x + p[at] + offset, form.z + p[at + 2]);
-        assert(Math.abs(p[at + 1] - (ground - 0.07)) < 0.00002, 'fold roots travel with the ground');
+        const renderedY = p[at + 1] * FORMATION_HEIGHT_SCALE + GROUND_Y * (1 - FORMATION_HEIGHT_SCALE);
+        assert(Math.abs(renderedY - (ground - 0.07 * FORMATION_HEIGHT_SCALE)) < 0.00002,
+          'rendered fold roots travel with the ground after composition scaling');
       }
+    }
+  }
+});
+
+// Test the actual composed roots, including the full width of arch feet.
+FORMATIONS.forEach((form, index) => {
+  const p = shapes[index].positions;
+  for (let i = 0; i < p.length; i += 3)
+    assert(Math.abs(form.z + p[i + 2]) > 0.85, `${form.name}: geometry stays outside the physical lane`);
+  if (form.kind !== 'arch') return;
+  for (const travel of [0, 7, 39, 71]) {
+    const world = new LandscapeMotion(); world.travel = travel;
+    for (let row = 0; row <= 16; row++) for (const end of [0, 80]) {
+      const at = (row * 81 + end) * 3;
+      const ground = terrainHeight(world.formationX(form.x) + p[at] + travel, form.z + p[at + 2]);
+      const renderedY = p[at + 1] * FORMATION_HEIGHT_SCALE + GROUND_Y * (1 - FORMATION_HEIGHT_SCALE);
+      assert(Math.abs(renderedY - (ground - 0.14 * FORMATION_HEIGHT_SCALE)) < 0.00002,
+        'complete arch root cross-section stays buried through world wrap');
     }
   }
 });
@@ -167,6 +188,8 @@ world.update(NaN, null, 'idle'); assert(Number.isFinite(world.travel));
 
 // Verify the player-facing momentum envelope, not just constant-speed integration.
 const envelopes = [];
+assert(Math.abs(wpmToIntensity(60) * MAX_WORLD_VELOCITY - 6) < 0.15, '60 retains established traversal pace');
+assert(wpmToIntensity(90) / wpmToIntensity(60) > 1.25, '90 adds cadence without a style threshold');
 for (const fps of [30, 60, 120]) {
   const journey = new LandscapeMotion();
   for (const wpm of [15, 30, 45, 60, 90, 0]) {
@@ -174,7 +197,7 @@ for (const fps of [30, 60, 120]) {
     for (let i = 0; i < fps * 2; i++) journey.update(1 / fps, { ...motion, intent }, 'running');
     if (intent > 0) assert(Math.abs(journey.velocity - intent * MAX_WORLD_VELOCITY) < 0.02);
   }
-  assert(journey.velocity > 0 && journey.velocity < 0.04, 'small coasting tail after input ends');
+  assert(journey.intensity > 0 && journey.intensity < 0.006, 'less than 0.6% momentum remains after two seconds coasting');
   envelopes.push(journey.distance);
 }
 assert(envelopes.every(distance => Math.abs(distance - envelopes[0]) < 1e-9), 'acceleration/deceleration is frame-rate independent');
@@ -251,7 +274,7 @@ console.log(`Landscape passed: ${triangles} triangles, safe physical lane, perio
 // Energy reads the actual momentum model. Exercise sustained input, coast, accepted
 // errors and suppression without altering any physical/contact signal.
 const { WorldEnergy } = await import(pathToFileURL(path.join(compiled, 'worldEnergy.mjs')));
-const { createEnergyGeometry, MOTE_COUNT, ENERGY_PATHS } = await import(pathToFileURL(path.join(compiled, 'energyGeometry.mjs')));
+const { createEnergyGeometry, ENERGY_PATHS } = await import(pathToFileURL(path.join(compiled, 'energyGeometry.mjs')));
 const snapshots = [];
 for (const fps of [30, 60, 120]) {
   const energy = new WorldEnergy(), world = new LandscapeMotion();
@@ -272,8 +295,8 @@ for (const fps of [30, 60, 120]) {
     levels.push(value.x);
   }
   assert(levels.every((n, i) => !i || n > levels[i - 1]), 'smoothly increasing vocabulary');
-  assert(levels[0] < 0.12 && levels[3] > 0.85, 'subtle 15; full experience at 60');
-  assert(levels[4] / levels[3] < 1.2, '90 intensifies rather than changes the vocabulary');
+  assert(levels[0] < 0.12 && levels[3] > 0.8, 'subtle 15; established energy at 60');
+  assert(levels[4] / levels[3] > 1.15 && levels[4] / levels[3] < 1.25, '90 has restrained headroom within the same vocabulary');
   signal.stumbleSequence++; advance(1 / fps);
   assert.equal(value.w, 1, 'one accepted error interrupts continuity');
   const velocity = world.velocity;
@@ -299,10 +322,10 @@ for (const fps of [30, 60, 120]) {
 }
 assert(Math.max(...snapshots) - Math.min(...snapshots) < 0.002, 'frame-rate independent energy');
 const energyGeometry = createEnergyGeometry();
-assert.equal(MOTE_COUNT, 32); assert.equal(ENERGY_PATHS.length, 6);
-assert.equal(energyGeometry.index.count / 3, 848, 'one fixed inexpensive optical batch');
+assert.equal(ENERGY_PATHS.length, 6);
+assert.equal(energyGeometry.index.count / 3, 768, 'six paths only; invisible motes/contact glow removed');
 for (const attr of Object.values(energyGeometry.attributes)) assert(attr.array.every(Number.isFinite));
 for (const index of energyGeometry.index.array) assert(index < energyGeometry.attributes.position.count);
 assert(ENERGY_PATHS.every(([, z]) => z < -1.15), 'all paths behind the foot corridor');
 energyGeometry.dispose();
-console.log('Energy passed: calibrated progression, bounded memory, acceleration, error recovery, reduced motion, reset, 30/60/120 Hz and one 848-triangle batch.');
+console.log('Energy passed: calibrated progression, bounded memory, acceleration, error recovery, reduced motion, reset, 30/60/120 Hz and one 768-triangle batch.');

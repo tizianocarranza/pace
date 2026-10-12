@@ -1,28 +1,211 @@
 # Landscape and material family
 
-## Phase 2 material pilot (current)
+## Phase 5 motion and visual energy (current)
 
-Study B is user-approved and locked. Only ContinuousTerrain, WesternFold and
-SuspendedStone receive the physical materials in `pilotMaterials.ts`. The rest
-retain their previous finishes. `StudioEnvironment.tsx` generates a shared linear
-HDR studio texture and PMREM; white remains the visible background. Pip keeps
-its existing opaque material and all motion systems remain unchanged.
+The Phase 1 composition switch was still forcing energy to zero and leaving
+`EnvironmentEnergy` unmounted. The existing `WorldEnergy` now runs after world
+momentum and contact sampling. It drives the landscape and all three optical
+pilot surfaces. Camera, static geometry, base material parameters and the
+physical contact plane remain fixed. Gameplay statistics are unaffected.
 
+`visualSpeed.ts` remains the single real/simulated mapping:
+`clamp(wpm / 90, 0, 1) ** 0.6`. Intensities at 15/30/45/60/90 are
+0.341/0.517/0.660/0.784/1.000. Full expression moves from 65 to 90 WPM.
+World maximum velocity becomes 7.6 units/s so 60 retains 5.96 units/s (previously
+6.03); 90 reaches 7.6. Acceleration/coasting rates and exact distance integration
+are unchanged. The eastern near bank runs at 91% of the western bank's relative
+rate, breaking their locked cadence without moving the approved idle anchors.
+
+Energy is smoothstep(momentum, 0.2, 1): about 0.82 at steady 60 and 1 at 90.
+Sustained response builds with bounded memory and decays after slowing. Two
+overlapping surface catches use integer temporal harmonics, avoiding a jump
+when the phase wraps. The phase follows velocity and settles as movement ends.
+Accepted stumble events interrupt only nearby light and recover exponentially;
+the world does not brake when Pip stumbles. Existing landing pressure, fragment
+response, event pools and reduced-motion handling are preserved.
+
+Six existing paths remain in one 768-triangle batch behind the physical lane.
+Their placement follows the current terrain; they write no depth, respect Pip's
+depth, and fade at both ends of the phase cycle. Their material now follows the
+same tone mapping and actual render-target viewport as the rest of the scene.
+No new render targets, particles, blooms or world objects are added. The 32
+micro-motes and eight contact-glow quads were removed after five matched
+comparisons changed only 8-48 pixels by more than 2/255 at 1536x1024. The physical
+contact effects are separate and remain active. The energy batch is skipped at
+idle and after its continuous fade becomes imperceptible.
+
+Development-only Visual energy controls compare Off / Surfaces / On without
+resetting time, pose, contacts or traversal (`?energy=off|surfaces|on`). Production
+always uses On. Legacy review tools request energy=off explicitly. Phase 4
+historical comparisons now lock only idle to the old evidence, since Phase 5
+intentionally changes travel; matched current on/off comparisons remain strict.
+
+Local evidence is in `assets/reviews/phase5-energy`. Run
+`node scripts/review-materials.mjs --energy --wpm=60` and `--wpm=90` with separate
+`PACE_REVIEW_DIR` values ending in `/60` and `/90`; `PACE_REVIEW_PORT` selects a
+separate Chrome debugging port if needed. `--ablate` supports the earlier
+effect-removal experiment (the final batch already contains only paths).
+`node scripts/check-energy-review.mjs` checks matched poses, visible energy,
+brightness limits, resource reuse, real keyboard errors and coast recovery.
+The mobile sprint review uses `review-composition.mjs --mobile --energy --wpm=90`
+with `PACE_STUDIES=b`. Phase 6 quality tiers and hardware qualification are
+deliberately outside this pass.
+
+## Phase 4 optical depth (retained)
+
+The approved Study B framing, Phase 3 geometry and material parameters are
+unchanged. `ForegroundSoftness.ts` isolates only NearWesternBank,
+NearEasternBank and NearMineralFragment. The sharp scene and its refraction
+captures exclude those three meshes. Their linear, premultiplied color/coverage
+is rendered separately, filtered horizontally and vertically, then composited
+over the sharp frame. Pip never enters the blur buffers; HTML is outside WebGL.
+This is a selected near-layer treatment, not general depth of field.
+
+Two reusable half-resolution targets have a 1024-pixel long-edge cap, no MSAA
+and no mipmaps. The source has a depth renderbuffer; the blur scratch target
+does not. A 17-tap Gaussian per axis gives approximately six CSS pixels of
+softness independent of DPR. Transparent pixels contain zero color, preventing
+a white/dark fringe. Tone mapping and output conversion happen once at the
+final composite. Visibility, capture uniforms and renderer state are restored
+in `finally`; targets, helper triangle and materials are disposed on unmount.
+The pass bypasses rendering when all three near meshes are outside the frustum.
+
+`atmosphere.ts` supplies camera-space haze relative to Pip's fixed focal plane.
+It starts five units behind that plane and reaches 74% at 34 units. It replaces
+the old distance whitening and redundant boundary bleaching; the composition
+coverage masks protecting the sentence and lower interface remain. Haze adds
+no passes. Existing material-local reflection/transmission provides luminosity.
+No bloom was added: bright white background and opaque white Pip would make
+a blanket luminance threshold a poor selection mask.
+
+Development controls compare `?atmosphere=off`, `haze`, and `on` without resetting
+the world. Off restores the Phase 3 rendering baseline; haze enables only the
+new atmospheric response. Production uses on and has no comparison controls.
+Legacy material/composition capture commands explicitly select off.
+
+Capture with `PACE_REVIEW_DIR=assets/reviews/phase4-optics` and
+`node scripts/review-materials.mjs --atmosphere`. Then run
+`node scripts/check-atmosphere-review.mjs`; this requires the local frozen
+Phase 3 `baseline/report.json`. Mobile review uses `PACE_STUDIES=b`, a separate
+review directory, and `node scripts/review-composition.mjs --mobile --quick --atmosphere`.
+The local, Git-ignored review board includes matched Off/Haze/On images,
+closeups, a traversal through world wrap and mobile captures.
+
+At 1536x1024 DPR 1, on uses two additional 768x512 color textures (12 total),
+about 7.5 MiB of nominal color/depth storage. Idle remains 48 draws because
+near geometry no longer gets duplicated in refraction captures. Sampled travel
+is 24-50 draws, with no more than three extra fullscreen draws versus off.
+Warmed buffer/texture/framebuffer allocations remain stable through a wrap
+and mode switches. Pixel checks preserve Pip's eyes/body, sentence and white
+field exactly; the near-fragment crop has 51.5% of haze-only edge energy.
+These are software-renderer structural measurements, not a hardware FPS claim.
+
+The pass separates near softness, sharp focal objects and lower-contrast distance.
+TARGET still has richer local light transport and foreground shapes; this
+pass intentionally does not change those materials or geometry. Layer selection
+assumes the existing near objects stay in front of the focal scene. New objects
+crossing between planes would need a depth-aware compositing approach.
+
+## Phase 3 geometry and density (retained)
+
+Study B's camera and all FORMATIONS anchors are unchanged. The existing grids
+now describe an asymmetric leading sail, a broad distant fold and a reversed
+crest beyond the bend. Their second lobes are lower and separated in depth;
+the optical pilot still receives the same equal-sized index ranges. Arches use
+flattened sections with a broad shoulder and a thin return. The outer arch is
+lower, with its weight on the opposite shoulder.
+
+Terrain bands gain a smooth asymmetric cross-section shared by CPU and GPU.
+The nearest shelf is broader and lower. The level contact corridor, world period
+and existing near banks stay fixed. Formation roots compensate for the approved
+0.78 vertical scale; arch feet follow the terrain across their entire section.
+
+Secondary forms decrease from 37 to 32: remove two small sheets, two competing
+filament arches and one distant mineral. Remaining accents group around roots
+and shoulders with unequal scales and gaps. Small minerals gain facets; lens
+edges sink into terrain rather than floating as flat oval plates. Instancing
+and shared buffers remain. Landscape triangles stay at 88,896; detail triangles
+drop from 9,672 to 7,248, including the existing near fragment. Detail draws drop
+from ten to nine. No materials or rendering effects were added in Phase 3.
+
+Run `node scripts/check-landscape-topology.mjs` for the environment regressions
+and transverse triangle-crossing checks. Shared seams/tips and coplanar overlap
+are excluded from that intersection diagnostic. The existing root assertions
+now test rendered positions after scaling, and arch root checks were added.
+
+Matched evidence is in the local, Git-ignored `assets/reviews/phase3-geometry`.
+Capture with `PACE_REVIEW_DIR=assets/reviews/phase3-geometry` and
+`node scripts/review-materials.mjs --geometry`, then run
+`node scripts/check-geometry-review.mjs`. The latter requires the frozen baseline
+in that review directory; it verifies unchanged camera, anchors, Pip pose,
+materials, lighting and world travel against Phase 2. Fixed screen crops isolate
+geometry changes without recentering the views. No material budget was increased.
+
+The pass is ready for visual review. Broad terrain bands and the small shared
+shape vocabulary remain simpler than TARGET; the pre-existing Phase 2 optical
+limitations remain. No further phase or material rollout is included.
+
+## Phase 2 material pilot (retained)
+
+Study B is approved and locked. Only ContinuousTerrain, WesternFold and
+SuspendedStone receive the physical pilot materials. Other scenery retains its
+previous finishes. Pip, geometry, physical lane, gameplay, world motion and WPM
+simulation are unchanged. No post-processing was active in the Phase 2 baseline.
+
+The ground is opaque and rough with deeper cool basins. The thin sheet uses
+white diffuse color, .99 transmission and selective warm absorption: attenuation
+#f3954d / distance .09, thickness .055 * (.08 + density squared * .92) / incidence.
+The blue mineral uses white diffuse color, .98 transmission, roughness .055-.09
+and attenuation #356cac / distance .92. A bounding ellipsoid estimates its
+absorption path and exit normal; the outgoing ray reaches at most .75 scene
+units toward the captured background depth. This is not a mesh ray trace.
+
+StudioEnvironment.tsx generates one linear HDR studio texture and PMREM.
+White remains the visible background. Pip keeps its existing opaque material.
 Development controls compare Current, Shared light and Pilot without remounting
-the world. Shared light retains the old finishes with the new illumination and
-tone mapping. The optical pilot uses native transmission, not alpha blending;
-the terrain remains opaque. No post-processing is active. Full comparisons,
-cost measurements, limitations and criterion grades are in
-`assets/reviews/phase2-materials/README.md` and its adjacent review board.
+the world. Physical optics use opacity 1, depth writing and NoBlending; the
+transparent queue supplies ordering, not alpha-based transmission.
 
-Review artifacts are local and ignored by Git. Run `node scripts/review-materials.mjs`
-with the development server on port 3000 to regenerate matched captures and
-`report.json`, then run `node scripts/check-material-review.mjs`. The captured
-pilot uses one shared half-resolution transmission target; idle measured 40 draws
-and 190,032 submitted triangles versus 25 / 104,136 for Current. These are software
-renderer counts, not hardware FPS. The pilot remains promising but unapproved:
-the sheet still reads partly as satin, mineral internal depth needs refinement,
-and native transmission cannot resolve nested sheets/legacy alpha surfaces fully.
+LayeredOptics.tsx owns three reusable color/depth targets, half resolution
+with the longer edge capped at 1024 pixels. It captures existing scenery with
+the sheet/mineral hidden, then renders the rear fold from its existing index
+range. The front fold samples that layer. When both optical objects are visible,
+one additional draw renders the complete sheet into the third target. The
+mineral now sees both fold lobes; their captured depth rejects nearer folds.
+Sheet optics, material parameters and shared lighting are unchanged by this
+latest continuation. The improvement is localized to the overlapping mineral.
+
+No capture runs when both optical objects leave view. The rear-fold pass is
+skipped when only the mineral is visible; the complete-fold pass needs both.
+Targets are explicitly disposed. Renderer state, visibility and the full draw
+range are restored in finally. No world meshes or geometry buffers are added.
+
+At 1536x1024 DPR 1, idle measured 50 draws / 210,384 submitted triangles versus
+49 / 204,240 for the preceding warm pilot and 25 / 104,136 for Current. The
+sampled traversal spans 22-52 draws. Three 768x512 half-float color/depth pairs
+use 10 renderer textures including existing resources; the third pair adds
+about 4.5 MiB of nominal storage. Actual hardware time remains unmeasured.
+Warmed buffer/texture/framebuffer allocations remain stable through the wrap
+and comparison switches. These are software-renderer structural counts, not FPS.
+
+The pilot remains **9 PASS / 3 PARTIAL**, recommendation B. Both fold lobes now
+appear in mineral transmission, but fixed lobe ordering, legacy alpha depth,
+half-resolution detail and approximate mineral exits remain limitations. The
+untouched scenery still dominates portions of the traversal. No broader
+material propagation follows from this assessment.
+
+Review artifacts are local and ignored by Git. The board, motion capture,
+architecture, costs and all twelve grades are in assets/reviews/phase2-materials.
+With the development server on port 3000, run:
+
+    node scripts/review-materials.mjs
+    node scripts/check-material-review.mjs --baseline=warm-baseline --nested-fold-budget
+
+The latest budget comparison requires exactly one existing full-sheet draw
+(6,144 triangles) when the third capture is active, one additional color/depth
+pair and no geometry growth. Pose, camera, travel, illumination, Pip identity,
+allocation stability and restored renderer-state checks remain enforced.
+The --same-submissions flag remains available for parameter-only refinements.
 
 ## Phase 1 composition study (approved baseline)
 
@@ -207,7 +390,7 @@ Updates use refs and uniforms, without React state or per-frame mesh allocation.
 Reduced motion freezes travel and secondary motion; results fade the world after Pip exits; reset
 restores the initial view. The prior illustration effects remain removed.
 
-## Visual energy
+## Visual energy prototype (superseded by Phase 5 above)
 
 `worldEnergy.ts` reads the existing smoothed world intensity. Its squared response
 keeps 15 WPM quiet while 60 WPM receives roughly 89% of the light response; 90 WPM
