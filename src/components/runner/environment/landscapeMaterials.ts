@@ -11,6 +11,7 @@ export function createLandscapeMaterials(interactions = new WorldInteractions())
     uPhase: { value: 0 }, uMomentum: { value: new THREE.Vector2() },
     uEnergy: { value: new THREE.Vector4() }, uEnergyPhase: { value: 0 },
     uCompositionGray: { value: 0 },
+    uAtmosphere: { value: 0 }, uNearCapture: { value: 0 },
     uImpulses: { value: interactions.packed }, uImpulseParameters: { value: interactions.parameters },
     uResolution: { value: new THREE.Vector2(1, 1) },
     uPearl: { value: new THREE.Color("#eef0f8") },
