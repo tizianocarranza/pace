@@ -1,6 +1,7 @@
 import { terrainField } from "./terrainProfile";
 import { interactionField } from "./worldInteractions";
 import { energyField } from "./worldEnergy";
+import { atmosphereField } from "./atmosphere";
 
 export const landscapeVertex = /* glsl */ `
   uniform float uTravel;
@@ -115,12 +116,15 @@ export const landscapeFragment = /* glsl */ `
   uniform float uVisibility;
   uniform vec2 uResolution;
   uniform float uCompositionGray;
+  uniform float uAtmosphere;
+  uniform float uNearCapture;
   varying vec3 vWorld;
   varying vec3 vNormal;
   varying float vObjectX;
   varying vec3 vLocal;
   varying float vFilament;
   ${energyField}
+  ${atmosphereField}
 
   // Broad reflection lobes use the shared world light directions. No scene capture.
   float studioCard(vec3 reflection, vec3 direction, float spread) {
@@ -269,10 +273,13 @@ export const landscapeFragment = /* glsl */ `
     float pathClarity = 1.0 - smoothstep(0.4, 1.5, abs(vWorld.z));
     float diffusion = (warmPool * 0.08 + amberPool * 0.14 + transmittedPool * 0.1) * (1.0 - pathClarity * 0.72);
     color = mix(color, mix(uWarmLight, vec3(1.0), 0.76), diffusion);
-    float atmosphere = smoothstep(3.0, 28.0, -vWorld.z);
+    float legacyAir = smoothstep(3.0, 28.0, -vWorld.z);
     vec3 air = mix(uCoolLight, vec3(1.0), 0.88);
-    air = mix(air, vec3(1.0), atmosphere);
-    color = mix(color, air, atmosphere * 0.985);
+    if (uAtmosphere > 0.5) {
+      color = mix(color, air, distanceHaze(vWorld));
+    } else {
+      color = mix(color, mix(air, vec3(1.0), legacyAir), legacyAir * 0.985);
+    }
     float nearFade = smoothstep(6.0, 10.0, vWorld.z);
     #ifdef FOREGROUND
       nearFade = 0.0;
@@ -292,7 +299,7 @@ export const landscapeFragment = /* glsl */ `
     frame *= 1.0 - sentenceColumn * smoothstep(0.60, 0.66, screen.y);
     // Bleach boundary surfaces before their coverage disappears, avoiding a cut-out silhouette.
     float boundaryAir = max(max(nearFade, farFade), max(edge, 1.0 - frame));
-    color = mix(color, vec3(1.0), smoothstep(0.05, 0.9, boundaryAir) * 0.78);
+    color = mix(color, vec3(1.0), smoothstep(0.05, 0.9, boundaryAir) * 0.78 * (1.0 - uAtmosphere));
     float presence = (1.0 - nearFade) * (1.0 - farFade) * (1.0 - edge) * frame * uVisibility;
     // Neutral study mode uses this same shader/geometry, without new materials.
     color = mix(color, vec3(0.22 + 0.66 * light), uCompositionGray);
@@ -303,7 +310,16 @@ export const landscapeFragment = /* glsl */ `
     #endif
     #include <tonemapping_fragment>
     #if MATERIAL_KIND != 1 && MATERIAL_KIND != 2
-      gl_FragColor.rgb = mix(vec3(1.0), gl_FragColor.rgb, presence);
+      #ifdef FOREGROUND
+        if (uNearCapture > 0.5) {
+          // Linear premultiplied coverage: blur never samples a white backdrop.
+          gl_FragColor = vec4(gl_FragColor.rgb * presence, presence);
+        } else {
+          gl_FragColor.rgb = mix(vec3(1.0), gl_FragColor.rgb, presence);
+        }
+      #else
+        gl_FragColor.rgb = mix(vec3(1.0), gl_FragColor.rgb, presence);
+      #endif
     #endif
     #include <colorspace_fragment>
   }
