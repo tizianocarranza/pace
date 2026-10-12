@@ -4,6 +4,11 @@ import { GROUND_Y, WORLD_PERIOD, terrainHeight } from "./terrainProfile";
 export { GROUND_Y, WORLD_PERIOD, terrainHeight } from "./terrainProfile";
 
 const TAU = Math.PI * 2;
+// The approved composition compresses formations vertically about GROUND_Y.
+// Author terrain attachment in inverse-scaled space so roots still meet it.
+export const FORMATION_HEIGHT_SCALE = 0.78;
+const formationGround = (x: number, z: number) =>
+  GROUND_Y + (terrainHeight(x, z) - GROUND_Y) / FORMATION_HEIGHT_SCALE;
 
 export type MeshData = { positions: Float32Array; normals: Float32Array; indices: Uint32Array };
 export function surface(columns: number, rows: number, sample: (u: number, v: number) => [number, number, number]): MeshData {
@@ -98,31 +103,47 @@ export function createFormation(form: Formation) {
   }
   if (form.kind === "arch") {
     const distant = form.z < -15;
+    const outer = form.name === "OuterBridge";
     return surface(80, 16, (u, v) => {
       const angle = u * Math.PI;
       const rise = Math.sin(angle);
-      const shoulder = 1 - 0.17 * Math.exp(-(((u - 0.68) / 0.13) ** 2));
-      const thickness = 0.17 + 0.52 * (1 - rise) ** 2 + 0.22 * Math.exp(-(((u - 0.22) / 0.18) ** 2));
-      const twist = v * TAU + (distant ? 0.35 : 1.4) * Math.sin(angle * 1.35) - 0.4;
-      const radius = Math.cos(twist) * thickness;
-      const x = Math.cos(angle) * form.width + rise * form.width * (0.28 + 0.18 * Math.sin(angle * 2)) + radius * Math.cos(angle);
-      const z = Math.sin(twist) * form.depth * (0.32 + 0.75 * rise) + rise * Math.sin(angle * 2 + 0.4) * (distant ? 0.5 : 1.1);
-      const root = THREE.MathUtils.lerp(terrainHeight(form.x + form.width, form.z), terrainHeight(form.x - form.width, form.z), u);
-      const height = rise ** 0.88 * shoulder * (1 + 0.16 * Math.cos(angle)) * form.height;
-      return [x, root - 0.35 + height + radius * rise, z];
+      // A broad loaded shoulder and a narrow return, rather than a uniform tube.
+      // OuterBridge is a lower, wider vault; the distant arch stays restrained.
+      const shoulder = Math.exp(-(((u - (outer ? 0.66 : 0.28)) / 0.22) ** 2));
+      const breadth = 0.14 + 0.42 * (1 - rise) ** 2 + shoulder * (distant ? 0.22 : 0.75);
+      const section = v * TAU;
+      const turn = (outer ? -0.65 : 0.85) * Math.sin(angle) - 0.25;
+      const across = Math.cos(section) * breadth;
+      const depth = Math.sin(section) * form.depth * (0.13 + 0.22 * rise);
+      const radial = across * Math.cos(turn) - depth * Math.sin(turn);
+      const x = Math.cos(angle) * form.width + rise * form.width * (outer ? -0.14 : 0.24)
+        + radial * Math.cos(angle);
+      const z = across * Math.sin(turn) + depth * Math.cos(turn)
+        + rise * Math.sin(angle * 1.4 + (outer ? 1.1 : 0.2)) * (distant ? 0.3 : 0.72);
+      const height = rise ** (outer ? 0.72 : 1.05) * (1 + (outer ? -0.13 : 0.10) * Math.cos(angle))
+        * form.height * (outer ? 0.84 : 1);
+      return [x, formationGround(form.x + x, form.z + z) - 0.14 + height + radial * rise, z];
     });
   }
   const layers = form.z < -15 ? 1 : 2;
+  const western = form.name === "WesternFold";
+  const far = form.name === "FarFold";
   return joinSurfaces(Array.from({ length: layers }, (_, layer) => surface(64, 24, (u, v) => {
-    const envelope = Math.sin(u * Math.PI) ** 1.45;
-    const notch = 1 - 0.36 * Math.exp(-(((u - 0.68) / 0.13) ** 2));
-    const pleat = 0.68 + 0.24 * Math.sin(v * Math.PI) + 0.08 * Math.sin(v * TAU * 1.5 + u * 2.0);
-    const height = envelope * notch * pleat * form.height * (layer ? 0.63 : 1);
-    const x = (u - 0.5) * form.width * (layer ? 0.86 : 1) + height * (0.20 + v * 0.22);
-    const curl = envelope * Math.sin(v * Math.PI * 1.45) * (layer ? 0.9 : 1.85);
-    const widthTaper = 0.14 + 0.86 * Math.sin(u * Math.PI) ** 0.65;
-    const z = (v - 0.5) * form.depth * widthTaper * (layer ? 0.7 : 1) + curl - layer * 0.9;
-    return [x, terrainHeight(form.x + x, form.z + z) - 0.07 + height, z];
+    const span = Math.sin(u * Math.PI);
+    const shifted = u + span * (western ? 0.16 : far ? -0.08 : -0.17);
+    const envelope = Math.sin(shifted * Math.PI) ** (western ? 1.65 : 1.15);
+    // A tall leading sail trails into a low lip. Other regions reverse the
+    // balance instead of repeating the same notch at a different scale.
+    const cross = 0.32 + 0.68 * Math.sin(v * Math.PI * 0.78);
+    const shoulder = 1 - (western ? 0.16 : 0.09) * Math.exp(-(((u - 0.74) / 0.18) ** 2));
+    const height = envelope * cross * shoulder * form.height * (layer ? 0.48 : 1);
+    const x = (u - 0.5) * form.width * (layer ? 0.88 : 1)
+      + span * ((western ? 0.85 : -0.55) + (v - 0.5) * 0.4);
+    const widthTaper = 0.12 + 0.88 * span ** 0.8;
+    const z = (v - 0.5) * form.depth * widthTaper * (layer ? 0.62 : 1)
+      + span * (western ? 0.65 : -0.35) + envelope * Math.sin(v * Math.PI) * 0.12
+      - layer * form.depth * 0.9;
+    return [x, formationGround(form.x + x, form.z + z) - 0.07 + height, z];
   })));
 }
 
