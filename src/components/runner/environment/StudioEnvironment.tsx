@@ -66,7 +66,9 @@ export function StudioEnvironment() {
     environment.current = target;
     scene.background = new THREE.Color("white");
     gl.outputColorSpace = THREE.SRGBColorSpace;
-    gl.toneMapping = THREE.ACESFilmicToneMapping;
+    // Neutral keeps white at white and preserves accent hue; ACES greyed the
+    // high-key field and desaturated the cobalt/peach accents.
+    gl.toneMapping = THREE.NeutralToneMapping;
     gl.toneMappingExposure = 1;
     // One shared native transmission capture, quarter of the full pixel area.
     gl.transmissionResolutionScale = 0.5;

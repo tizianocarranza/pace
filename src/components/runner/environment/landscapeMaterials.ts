@@ -14,11 +14,12 @@ export function createLandscapeMaterials(interactions = new WorldInteractions())
     uAtmosphere: { value: 0 }, uNearCapture: { value: 0 },
     uImpulses: { value: interactions.packed }, uImpulseParameters: { value: interactions.parameters },
     uResolution: { value: new THREE.Vector2(1, 1) },
-    uPearl: { value: new THREE.Color("#eef0f8") },
-    uBlue: { value: new THREE.Color("#487fbe") },
-    uViolet: { value: new THREE.Color("#ac96d9") },
-    uDeep: { value: new THREE.Color("#2b527e") },
-    uWarm: { value: new THREE.Color("#f0ac72") },
+    // High-key field with saturated cobalt, periwinkle and peach accents.
+    uPearl: { value: new THREE.Color("#f6f7fd") },
+    uBlue: { value: new THREE.Color("#4a74e6") },
+    uViolet: { value: new THREE.Color("#a493f2") },
+    uDeep: { value: new THREE.Color("#2440a8") },
+    uWarm: { value: new THREE.Color("#f79a5c") },
   };
   function surface(name: string, kind: number, warm = false) {
     const translucent = kind === 1 || kind === 2;

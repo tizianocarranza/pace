@@ -12,7 +12,7 @@ type Role = "ground" | "sheet" | "mineral";
 /** Three opt-in surfaces. Keep the physical BRDF and volume absorption while
  * supplying the existing deformation, thickness estimates and layered capture. */
 export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) {
-  const ground = new THREE.MeshPhysicalMaterial({ name: "Pilot / calm ground", color: "#b0bdd8",
+  const ground = new THREE.MeshPhysicalMaterial({ name: "Pilot / calm ground", color: "#eef0fa",
     roughness: 0.48, metalness: 0, ior: 1.46, specularIntensity: 0.7 });
   const sheet = new THREE.MeshPhysicalMaterial({ name: "Pilot / thin peach resin", color: "#ffffff",
     roughness: 0.07, metalness: 0, ior: 1.42, transmission: 0.99, thickness: 0.055,
@@ -92,8 +92,10 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
         float basin = (0.5 + 0.5 * sin((vPilotWorld.x + uTravel) * 0.42 + vPilotWorld.z * 0.85));
         float outsideLane = smoothstep(0.7, 2.5, abs(vPilotWorld.z));
         // Concentrate value in the basin instead of darkening the whole floor.
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.026,0.075,0.20), basin * basin * outsideLane * 0.86);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.96,0.73,0.55), (1.0-basin) * outsideLane * 0.16);
+        // Saturated periwinkle/cobalt pools and peach warmth on a near-white floor.
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.08,0.14,0.62), pow(basin, 4.0) * outsideLane * 0.78);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42,0.30,0.85), basin * (1.0-basin) * outsideLane * 0.12);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0,0.56,0.32), pow(1.0-basin, 4.0) * outsideLane * 0.26);
       ` : role === "sheet" ? `
         float density = smoothstep(-2.0,3.0,vPilotLocal.x) * (0.5+0.5*sin(vPilotLocal.z*1.8));
       ` : `
@@ -102,6 +104,12 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + variation);
       shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n' +
         (role === "ground" ? 'roughnessFactor = mix(0.36,0.62,basin);' : 'roughnessFactor += density * 0.035;'));
+      if (role === "ground") {
+        // scene.environment ignores material.envMapIntensity. Without this the
+        // studio's blue/violet cards wash every grazing slope lavender.
+        shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>',
+          '#include <lights_fragment_maps>\n  radiance *= 0.6; iblIrradiance *= 0.7;');
+      }
       if (role !== "ground") {
         let transmissionChunk = THREE.ShaderChunk.transmission_pars_fragment;
         if (role === "mineral") {

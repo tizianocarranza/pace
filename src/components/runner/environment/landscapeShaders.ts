@@ -236,7 +236,8 @@ export const landscapeFragment = /* glsl */ `
     #endif
 
     // Shared colored irradiance unifies the family; transmitted light is not a glow halo.
-    color *= vec3(0.68 + light * 0.28) + uWarmLight * warmEnergy * 0.10 + uCoolLight * coolEnergy * 0.10;
+    // Shading lifts toward white rather than sinking into grey mid-tones.
+    color *= vec3(0.80 + light * 0.22) + uWarmLight * warmEnergy * 0.10 + uCoolLight * coolEnergy * 0.10;
     float warmReflection = studioCard(reflection, uWarmDirection, 0.14);
     color = mix(color, uWarmLight, min(0.5, warmEnergy * 0.035 + warmReflection * 0.24 + transmission * 0.45));
     color = mix(color, uCoolLight, coolEnergy * (0.025 + fresnel * 0.12));
