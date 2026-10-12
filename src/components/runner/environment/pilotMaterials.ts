@@ -13,7 +13,9 @@ type Role = "ground" | "sheet" | "mineral";
  * supplying the existing deformation, thickness estimates and layered capture. */
 export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) {
   const ground = new THREE.MeshPhysicalMaterial({ name: "Pilot / calm ground", color: "#eef0fa",
-    roughness: 0.48, metalness: 0, ior: 1.46, specularIntensity: 0.7 });
+    roughness: 0.2, metalness: 0, ior: 1.46, specularIntensity: 0.7,
+    // A thin wet sheet: a sharp clear layer over a slightly softer base.
+    clearcoat: 0.8, clearcoatRoughness: 0.07 });
   const sheet = new THREE.MeshPhysicalMaterial({ name: "Pilot / thin peach resin", color: "#ffffff",
     roughness: 0.07, metalness: 0, ior: 1.42, transmission: 0.99, thickness: 0.055,
     attenuationColor: "#f3954d", attenuationDistance: 0.09, side: THREE.DoubleSide });
@@ -103,12 +105,19 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
       `;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + variation);
       shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n' +
-        (role === "ground" ? 'roughnessFactor = mix(0.36,0.62,basin);' : 'roughnessFactor += density * 0.035;'));
+        (role === "ground" ? 'roughnessFactor = mix(0.14,0.3,basin);' : 'roughnessFactor += density * 0.035;'));
       if (role === "ground") {
         // scene.environment ignores material.envMapIntensity. Without this the
-        // studio's blue/violet cards wash every grazing slope lavender.
-        shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>',
-          '#include <lights_fragment_maps>\n  radiance *= 0.6; iblIrradiance *= 0.7;');
+        // studio's blue/violet cards wash every grazing slope lavender, and the
+        // glossy sheet mirrors the warm card as a pink flood. Keep only a hint.
+        shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', `
+          #include <lights_fragment_maps>
+          iblIrradiance *= 0.7;
+          const vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+          radiance = mix(radiance, vec3(dot(radiance, luma)), 0.5) * 0.85;
+          #ifdef USE_CLEARCOAT
+            clearcoatRadiance = mix(clearcoatRadiance, vec3(dot(clearcoatRadiance, luma)), 0.5);
+          #endif`);
       }
       if (role !== "ground") {
         let transmissionChunk = THREE.ShaderChunk.transmission_pars_fragment;
@@ -204,7 +213,7 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
           gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.96,0.975,1.0), distanceHaze(vPilotWorld));
         #include <tonemapping_fragment>
         vec2 screen = gl_FragCoord.xy / uResolution;
-        float frame = smoothstep(0.12,0.20,screen.y) * (1.0-smoothstep(0.67,0.77,screen.y));
+        float frame = smoothstep(0.15,0.26,screen.y) * (1.0-smoothstep(0.67,0.77,screen.y));
         float sentenceColumn = 1.0-smoothstep(0.22,0.38,abs(screen.x-0.5));
         frame *= 1.0-sentenceColumn*smoothstep(0.60,0.66,screen.y);
         float presence = frame * uVisibility * (1.0-smoothstep(29.0,37.0,-vPilotWorld.z))

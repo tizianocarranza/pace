@@ -291,7 +291,7 @@ export const landscapeFragment = /* glsl */ `
       edge = max(edge, smoothstep(24.0, 34.0, abs(vObjectX)));
     #endif
     vec2 screen = gl_FragCoord.xy / uResolution;
-    float frame = smoothstep(0.12, 0.20, screen.y) * (1.0 - smoothstep(0.67, 0.77, screen.y));
+    float frame = smoothstep(0.15, 0.26, screen.y) * (1.0 - smoothstep(0.67, 0.77, screen.y));
     // Crop at the viewport sides: a screen-edge fade made the world read as a
     // rectangular panel and erased the strongest near-plane depth cue.
     // Preserve the actual central sentence area, while letting cropped side
