@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { type PipStatus } from "../pipMotion";
 import { type PipMotionRef } from "../usePipMotion";
-import { LandscapeMotion, FORMATIONS, createFormation, createTerrain, createNearBank } from "./landscape";
+import { LandscapeMotion, FORMATIONS, FORMATION_HEIGHT_SCALE, createFormation, createTerrain, createNearBank } from "./landscape";
 import { createLandscapeMaterials, formationMaterial } from "./landscapeMaterials";
 import { updateLightingUniforms, type createLightingUniforms } from "./worldLighting";
 import { EnvironmentDetails } from "./EnvironmentDetails";
@@ -16,6 +16,11 @@ import { useComposition } from "../CompositionStudy";
 import { GROUND_Y } from "./terrainProfile";
 import { useMaterialStudy } from "../MaterialStudy";
 import { createPilotMaterials } from "./pilotMaterials";
+import { LayeredOptics, createOpticalUniforms } from "./LayeredOptics";
+import { useAtmosphere } from "../AtmosphereStudy";
+import { useEnergySelection } from "../EnergyStudy";
+import { WorldEnergy } from "./worldEnergy";
+import { EnvironmentEnergy } from "./EnvironmentEnergy";
 
 /** A fixed window into a continuous landscape, independent of Pip's placement. */
 export function ReactiveEnvironment({ motion, status }: {
@@ -24,6 +29,9 @@ export function ReactiveEnvironment({ motion, status }: {
 }) {
   const composition = useComposition();
   const materialMode = useMaterialStudy();
+  const atmosphere = useAtmosphere();
+  const energyMode = useEnergySelection();
+  const energy = useMemo(() => new WorldEnergy(), []);
   const controller = useRef<LandscapeMotion | null>(null);
   const formations = useRef<THREE.Group>(null);
   const nearBanks = useRef<THREE.Group>(null);
@@ -37,7 +45,8 @@ export function ReactiveEnvironment({ motion, status }: {
   }), [banks]);
   const interactions = useMemo(() => new WorldInteractions(), []);
   const surfaces = useMemo(() => createLandscapeMaterials(interactions), [interactions]);
-  const pilot = useMemo(() => createPilotMaterials(surfaces.terrain.uniforms), [surfaces]);
+  const optics = useMemo(() => createOpticalUniforms(), []);
+  const pilot = useMemo(() => createPilotMaterials(surfaces.terrain.uniforms, optics), [surfaces, optics]);
   const liveUniforms = useRef<THREE.ShaderMaterial["uniforms"] | null>(null);
   useLayoutEffect(() => { liveUniforms.current = surfaces.terrain.uniforms; }, [surfaces]);
   useEffect(() => {
@@ -55,15 +64,18 @@ export function ReactiveEnvironment({ motion, status }: {
     const world = controller.current ?? (controller.current = new LandscapeMotion());
     world.update(delta, motion.current, status);
     interactions.update(delta, motion.current, world, status);
+    energy.update(delta, motion.current, world, status);
     if (liveUniforms.current) {
       const live = liveUniforms.current;
       live.uTravel.value = world.travel;
       live.uVisibility.value = world.visibility;
       live.uPhase.value = world.phase;
       live.uMomentum.value.set(world.intensity, world.lag);
-      // Phase 1 evaluates space without optical decoration.
-      live.uEnergy.value.set(0, 0, 0, 0);
+      live.uEnergy.value.copy(energy.value);
+      if (energyMode === "off" || composition.gray) live.uEnergy.value.set(0, 0, 0, 0);
+      live.uEnergyPhase.value = energy.phase;
       live.uCompositionGray.value = composition.gray ? 1 : 0;
+      live.uAtmosphere.value = atmosphere === "off" ? 0 : 1;
       updateLightingUniforms(live as ReturnType<typeof createLightingUniforms>, world);
       const dpr = gl.getPixelRatio();
       live.uResolution.value.set(size.width * dpr, size.height * dpr);
@@ -71,8 +83,8 @@ export function ReactiveEnvironment({ motion, status }: {
     const structures = formations.current?.children;
     if (structures) for (let i = 0; i < structures.length; i++) {
       structures[i].position.x = world.formationX(FORMATIONS[i].x);
-      structures[i].scale.y = 0.78;
-      structures[i].position.y = GROUND_Y * 0.22;
+      structures[i].scale.y = FORMATION_HEIGHT_SCALE;
+      structures[i].position.y = GROUND_Y * (1 - FORMATION_HEIGHT_SCALE);
       if (FORMATIONS[i].kind === "stone") {
         const seed = FORMATIONS[i].x * 0.73 + FORMATIONS[i].z * 0.41;
         structures[i].position.y += (Math.sin(world.phase * 2 + seed) - Math.sin(seed)) * 0.055;
@@ -91,7 +103,7 @@ export function ReactiveEnvironment({ motion, status }: {
       const mesh = foreground[i];
       const heightScale = 0.85;
       const x = centerX + nearPassX(world.distance, halfWidth, 6 * bankScale,
-        (i ? 1 : -1) * (halfWidth + bankScale * 0.75), FOREGROUND_RATE);
+        (i ? 1 : -1) * (halfWidth + bankScale * 0.75), i ? FOREGROUND_RATE * 0.91 : FOREGROUND_RATE);
       mesh.position.set(x,
         heightAtScreen(camera as THREE.PerspectiveCamera, z, 0.69, x) - bankCrests[i] * heightScale, z);
       mesh.scale.set(bankScale, heightScale, 1);
@@ -100,6 +112,7 @@ export function ReactiveEnvironment({ motion, status }: {
 
   return (
     <group name="PaceLandscape">
+      <LayeredOptics uniforms={optics} nearCapture={surfaces.terrain.uniforms.uNearCapture} />
       <mesh name="ContinuousTerrain" frustumCulled={false}>
         {/* R3F owns and disposes these declarative resources. */}
         <bufferGeometry>
@@ -136,6 +149,7 @@ export function ReactiveEnvironment({ motion, status }: {
         ))}
       </group>
       <EnvironmentDetails surfaces={surfaces} world={controller} />
+      <EnvironmentEnergy surfaces={surfaces} enabled={energyMode === "on" && !composition.gray} />
     </group>
   );
 }

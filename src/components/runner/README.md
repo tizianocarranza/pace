@@ -1,7 +1,7 @@
 # Pip motion
 
 Visual speed is resolved once in `src/lib/visualSpeed.ts`: real WPM or the
-development simulator feeds one nonlinear 0–65 WPM intensity curve. See the
+development simulator feeds one nonlinear 0–90 WPM intensity curve. See the
 [WPM simulator](../debug/README.md) for controls and pipeline boundaries.
 The typing engine owns only real statistics. Held visual input uses the same
 controller, cadence, world momentum and finish behavior as normal gameplay.

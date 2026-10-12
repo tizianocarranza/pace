@@ -1,11 +1,13 @@
 type GameStatus = "idle" | "running" | "finished";
 
-export const FULL_VISUAL_WPM = 65;
+export const FULL_VISUAL_WPM = 90;
 
 /** One curve for every visual consumer; statistics always keep the original WPM. */
 export function wpmToIntensity(wpm: number) {
   const normalized = Number.isFinite(wpm) ? Math.min(1, Math.max(0, wpm) / FULL_VISUAL_WPM) : 0;
-  return normalized ** 0.75;
+  // 60 is an established run (0.78); 90 has real sprint headroom. One curve
+  // feeds Pip and the world, including the simulator. Scoring is unaffected.
+  return normalized ** 0.6;
 }
 
 /** Simulation overrides visual intent only. Real completion always takes priority. */

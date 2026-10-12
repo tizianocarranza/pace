@@ -16,15 +16,17 @@ assert.equal(wpmToIntensity(0), 0);
 for (const invalid of [-1, NaN, Infinity, -Infinity]) assert.equal(wpmToIntensity(invalid), 0);
 assert(wpmToIntensity(10) > 0.2);
 assert(wpmToIntensity(30) > 0.5 && wpmToIntensity(30) < 0.65);
-assert(wpmToIntensity(45) > 0.75);
-assert(wpmToIntensity(60) > 0.94);
-assert.equal(wpmToIntensity(65), 1);
+assert(wpmToIntensity(45) > 0.65 && wpmToIntensity(45) < 0.75);
+assert(wpmToIntensity(60) > 0.77 && wpmToIntensity(60) < 0.82);
+assert(wpmToIntensity(90) - wpmToIntensity(60) > 0.18, 'sprint has visible headroom');
+assert(wpmToIntensity(65) < 0.85);
+assert.equal(wpmToIntensity(90), 1);
 assert.equal(wpmToIntensity(90), wpmToIntensity(120));
 let previous = 0;
 for (let wpm = 0; wpm <= 120; wpm += 0.5) {
   const intensity = wpmToIntensity(wpm);
   assert(intensity >= previous && intensity <= 1);
-  assert(intensity - previous < 0.03, 'fine slider changes never jump visual modes');
+  assert(intensity - previous < 0.05, 'fine slider changes never jump visual modes');
   previous = intensity;
 }
 for (const wpm of [0, 15, 30, 45, 60, 90]) {

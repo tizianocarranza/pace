@@ -2,7 +2,8 @@ import { MathUtils } from "three";
 import { type PipMotionSignals, type PipStatus } from "../pipMotion";
 import { WORLD_PERIOD } from "./terrainProfile";
 
-export const MAX_WORLD_VELOCITY = 6.4;
+// Preserve roughly six world units/s at 60 WPM with the extended visual curve.
+export const MAX_WORLD_VELOCITY = 7.6;
 export const FOREGROUND_RATE = 1.18;
 export const FRAGMENT_RATE = 1.36;
 
