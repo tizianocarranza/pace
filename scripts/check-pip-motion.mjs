@@ -11,13 +11,14 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 
 const compiled = path.resolve('node_modules/.cache/pace-motion-check');
 await fs.mkdir(compiled, { recursive: true });
-for (const name of ['pipContacts', 'pipMotion', 'worldInteractions', 'composition']) {
+for (const name of ['pipContacts', 'pipFace', 'pipMotion', 'worldInteractions', 'composition']) {
   const source = await fs.readFile(`src/components/runner/${name === 'worldInteractions' ? 'environment/' : ''}${name}.ts`, 'utf8');
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
   });
   await fs.writeFile(path.join(compiled, `${name}.mjs`), outputText
-    .replace('"./pipContacts"', '"./pipContacts.mjs"').replace('"../pipContacts"', '"./pipContacts.mjs"'));
+    .replace('"./pipContacts"', '"./pipContacts.mjs"').replace('"../pipContacts"', '"./pipContacts.mjs"')
+    .replace('"./pipFace"', '"./pipFace.mjs"'));
 }
 const { PipMotion } = await import(pathToFileURL(path.join(compiled, 'pipMotion.mjs')));
 const { PIP_SOLE_Y } = await import(pathToFileURL(path.join(compiled, 'pipContacts.mjs')));
@@ -203,3 +204,58 @@ for (const fps of [30, 60, 120]) {
   f.motion.dispose();
 }
 console.log('World contact passed: real GLB landings at 30/60/120 Hz, grounded hysteresis, exactly-once pooled impulses, one disturbance per stumble, attached travel, reduced motion and reset.');
+
+// Face: blinks, expressions, reduced motion and reset.
+const firstBlinks = [];
+for (const fps of [30, 60, 120]) {
+  const f = fixture();
+  let lowest = 1, first = null;
+  for (let i = 0; i < fps * 6; i++) {
+    f.tick(1 / fps, 0, 'idle', false);
+    const open = f.motion.face.uEyeOpen.value;
+    if (first === null && open < 0.5) first = i / fps;
+    lowest = Math.min(lowest, open);
+  }
+  assert(lowest < 0.2 && first !== null, `blinks at rest at ${fps}Hz`);
+  firstBlinks.push(first);
+  for (let i = 0; i < fps * 0.4; i++) f.tick(1 / fps, 0, 'idle', false);
+  f.motion.dispose();
+}
+assert(Math.max(...firstBlinks) - Math.min(...firstBlinks) < 0.05, `blink timing is frame-rate independent: ${firstBlinks}`);
+
+{
+  const f = fixture();
+  let sprintOpen = 0;
+  for (let i = 0; i < 60 * 4; i++) {
+    f.tick(1 / 60, 1);
+    if (i >= 60 * 3) sprintOpen = Math.max(sprintOpen, f.motion.face.uEyeOpen.value);
+  }
+  assert(sprintOpen > 0.65 && sprintOpen < 0.8, `concentrated squint at speed: ${sprintOpen}`);
+  f.error();
+  let squeezed = 1, squeezedWidth = 1;
+  for (let i = 0; i < 60 * 0.5; i++) {
+    f.tick(1 / 60, 1);
+    squeezed = Math.min(squeezed, f.motion.face.uEyeOpen.value);
+    squeezedWidth = Math.max(squeezedWidth, f.motion.face.uEyeWidth.value);
+  }
+  assert(squeezed < 0.3 && squeezedWidth > 1.08, 'eyes squeeze shut through a stumble');
+  for (let i = 0; i < 60 * 1.5; i++) f.tick(1 / 60, 1);
+  for (let i = 0; i < 60 * 0.4; i++) f.tick(1 / 60, 1, 'finished');
+  assert(f.motion.face.uEyeWidth.value > 1.08, 'wide eyes at the finish');
+  f.tick(1 / 60, 0, 'idle', false);
+  assert.equal(f.motion.face.uEyeOpen.value, 1, 'reset restores the modeled eyes');
+  assert.equal(f.motion.face.uEyeWidth.value, 1);
+  f.motion.dispose();
+}
+
+{
+  const f = fixture();
+  f.motion.signals.reducedMotion = true;
+  for (let i = 0; i < 60 * 6; i++) {
+    f.tick(1 / 60, i < 60 * 3 ? 0 : 1, i < 60 * 3 ? 'idle' : 'running');
+    assert(Math.abs(f.motion.face.uEyeOpen.value - 1) < 1e-9 && Math.abs(f.motion.face.uEyeWidth.value - 1) < 1e-9,
+      'reduced motion keeps the modeled eyes: no blinks or expressions');
+  }
+  f.motion.dispose();
+}
+console.log('Face passed: deterministic blinks at 30/60/120 Hz, squint at speed, squeeze on stumble, wide finish, reset and reduced motion.');

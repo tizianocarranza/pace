@@ -2,9 +2,10 @@
 
 import { useLayoutEffect } from "react";
 import * as THREE from "three";
+import { type PipFace } from "./pipFace";
 
 /** A small surface adjustment; the cached GLB's materials stay reusable. */
-export function usePipSurface(scene: THREE.Group) {
+export function usePipSurface(scene: THREE.Group, face: PipFace) {
   useLayoutEffect(() => {
     const originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
     const surfaces = new Map<THREE.Material, THREE.MeshPhysicalMaterial>();
@@ -51,6 +52,16 @@ export function usePipSurface(scene: THREE.Group) {
           surface.roughness = 0.12;
           surface.clearcoat = 1;
           surface.clearcoatRoughness = 0.04;
+          // Blinks and expressions scale each eye about its own center before
+          // skinning, so the eyes still ride the body bone.
+          surface.onBeforeCompile = shader => {
+            shader.uniforms.uEyeOpen = face.uEyeOpen;
+            shader.uniforms.uEyeWidth = face.uEyeWidth;
+            shader.vertexShader = "attribute vec3 pipEyeCenter;\nuniform float uEyeOpen;\nuniform float uEyeWidth;\n"
+              + shader.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
+                transformed = pipEyeCenter + (transformed - pipEyeCenter) * vec3(uEyeWidth, uEyeOpen, uEyeWidth);`);
+          };
+          surface.customProgramCacheKey = () => "pip-eyes-v1";
         }
         surface.dithering = true;
         surfaces.set(source, surface);
@@ -58,6 +69,7 @@ export function usePipSurface(scene: THREE.Group) {
       return surface;
     };
 
+    const eyeGeometries: THREE.BufferGeometry[] = [];
     scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const original = object.material;
@@ -65,11 +77,24 @@ export function usePipSurface(scene: THREE.Group) {
       if (refined === original) return;
       originals.set(object, original);
       object.material = refined;
+      if (!Array.isArray(original) && original.name === "Pip | Soft black eyes") {
+        // The eye shader scales about this per-vertex center (bind space).
+        const geometry: THREE.BufferGeometry = object.geometry;
+        if (!geometry.boundingBox) geometry.computeBoundingBox();
+        const center = geometry.boundingBox!.getCenter(new THREE.Vector3());
+        const count = geometry.getAttribute("position").count;
+        const centers = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++) center.toArray(centers, i * 3);
+        geometry.setAttribute("pipEyeCenter", new THREE.BufferAttribute(centers, 3));
+        eyeGeometries.push(geometry);
+      }
     });
 
     return () => {
       for (const [mesh, material] of originals) mesh.material = material;
       for (const material of surfaces.values()) material.dispose();
+      // The geometry belongs to the cached GLB; leave it as it was loaded.
+      for (const geometry of eyeGeometries) geometry.deleteAttribute("pipEyeCenter");
     };
-  }, [scene]);
+  }, [scene, face]);
 }

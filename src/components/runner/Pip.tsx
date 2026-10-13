@@ -1,9 +1,10 @@
 "use client";
 
 import { Center, useGLTF } from "@react-three/drei";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { PIP_SOLE_Y } from "./pipContacts";
+import { createPipFace } from "./pipFace";
 import { PipShadow } from "./PipShadow";
 import { ReactiveEnvironment } from "./environment/ReactiveEnvironment";
 import { usePipSurface } from "./usePipSurface";
@@ -22,10 +23,11 @@ type PipProps = {
 export function Pip({ intensity, sustainedInput = false, lastCorrectAt, errorCount, status, onFinishExit }: PipProps) {
   const placement = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF("/models/pip.glb");
-  usePipSurface(scene);
+  const face = useMemo(() => createPipFace(), []);
+  usePipSurface(scene, face);
   usePipReflection(scene);
   const motion = usePipMotion(
-    scene, placement, animations, intensity, lastCorrectAt, errorCount, status, onFinishExit, sustainedInput,
+    scene, placement, animations, intensity, lastCorrectAt, errorCount, status, onFinishExit, sustainedInput, face,
   );
 
   return (

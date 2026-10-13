@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { createContacts, createContactSampler, resetContacts, type PipContacts } from "./pipContacts";
+import { createPipFace, type PipFace } from "./pipFace";
 
 export type PipStatus = "idle" | "running" | "finished";
 export type PipMotionSignals = {
@@ -17,10 +18,10 @@ export type PipMotionSignals = {
 type Spring = { value: number; velocity: number };
 
 // Exact damped oscillator: consistent compression/release at 30, 60 or 120 Hz.
-function springStep(spring: Spring, delta: number) {
-  const frequency = 19;
-  const drag = frequency * 0.72;
-  const damped = frequency * Math.sqrt(1 - 0.72 ** 2);
+// Frequency is angular (rad/s); damping is the ratio below critical (1).
+function springStep(spring: Spring, delta: number, frequency = 19, damping = 0.72) {
+  const drag = frequency * damping;
+  const damped = frequency * Math.sqrt(1 - damping ** 2);
   const decay = Math.exp(-drag * delta);
   const sine = Math.sin(damped * delta);
   const cosine = Math.cos(damped * delta);
@@ -30,6 +31,17 @@ function springStep(spring: Spring, delta: number) {
   spring.velocity = decay * (velocity * cosine
     - (drag * velocity + frequency ** 2 * value) / damped * sine);
 }
+
+// Deterministic pseudo-random sequence, so blinks are reproducible in checks.
+const blinkHash = (n: number) => {
+  const x = Math.sin(n * 12.9898 + 4.1414) * 43758.5453;
+  return x - Math.floor(x);
+};
+const blinkInterval = (n: number) => 2 + 3 * blinkHash(n);
+const BLINK_DURATION = 0.15;
+// The Body bone's local axes equal Blender's (see assets/pip/build_animated.py):
+// +Z up, -Y forward. Lean already rotates about X.
+const BODY_UP_AXIS = 2;
 
 /** Owns visual motion only. Scoring and the typing engine never depend on it. */
 export class PipMotion {
@@ -47,6 +59,17 @@ export class PipMotion {
   private readonly squashIndex: number | undefined;
   private readonly stretchIndex: number | undefined;
   private readonly compression: Spring = { value: 0, velocity: 0 };
+  // Softer, slower body follow-through after landings, start and finish.
+  private readonly bounce: Spring = { value: 0, velocity: 0 };
+  private readonly roll: Spring = { value: 0, velocity: 0 };
+  private breathPhase = 0;
+  private eyeOpen = 1;
+  private eyeWidth = 1;
+  private blinkClock = 0;
+  private blinkCount = 0;
+  private nextBlink = 0;
+  private blinkTime = -1;
+  private doubleBlink = false;
   private readonly viewProjection = new THREE.Matrix4();
   private readonly rightFrustumPlane = new THREE.Plane();
   private previousStatus: PipStatus = "idle";
@@ -60,6 +83,7 @@ export class PipMotion {
     private readonly model: THREE.Group,
     private readonly placement: THREE.Group,
     clips: THREE.AnimationClip[],
+    readonly face: PipFace = createPipFace(),
   ) {
     const idle = clips.find((clip) => clip.name === "Idle");
     const run = clips.find((clip) => clip.name === "Run");
@@ -92,6 +116,15 @@ export class PipMotion {
     this.exitVelocity = 0;
     this.exited = false;
     this.compression.value = this.compression.velocity = 0;
+    this.bounce.value = this.bounce.velocity = 0;
+    this.roll.value = this.roll.velocity = 0;
+    this.breathPhase = 0;
+    this.eyeOpen = this.eyeWidth = 1;
+    this.face.uEyeOpen.value = this.face.uEyeWidth.value = 1;
+    this.blinkClock = this.blinkCount = 0;
+    this.nextBlink = blinkInterval(0);
+    this.blinkTime = -1;
+    this.doubleBlink = false;
     this.signals.intent = this.signals.speed = this.signals.acceleration = this.signals.locomotion = this.signals.stumble = 0;
     this.signals.active = false;
     this.signals.stumbleSequence = 0;
@@ -120,6 +153,9 @@ export class PipMotion {
     if (status === "idle" && this.previousStatus !== "idle") this.reset(errors);
     if (status === "running" && this.previousStatus === "idle") {
       this.compression.velocity += 1.1 * reduced;
+      // A small start hop: the body pops up off planted feet, with a blink.
+      this.bounce.velocity += 1.1 * reduced;
+      if (reduced) this.blinkTime = 0;
     }
     if (status === "finished" && this.previousStatus !== "finished") {
       // The charge is measured in strides, so it belongs to the running cadence.
@@ -127,6 +163,8 @@ export class PipMotion {
       this.stumbling = false;
       this.stumble.stop();
       this.compression.velocity += 1.6 * reduced;
+      // Celebration before the exit run; the launch timing is unchanged.
+      this.bounce.velocity += 1.8 * reduced;
     }
     this.previousStatus = status;
     if (this.exited) return false;
@@ -182,17 +220,34 @@ export class PipMotion {
     this.mixer.update(dt);
 
     let landing = 0;
+    const [left, right] = motion.contacts.feet;
     for (const foot of motion.contacts.feet) landing = Math.max(landing, foot.impact);
     this.compression.velocity += landing * (1.4 + motion.speed * 1.8) * reduced;
     springStep(this.compression, dt);
+    // Follow-through: the body sinks a beat after each landing and rocks
+    // toward the landing foot, on slower springs than the compression.
+    this.bounce.velocity -= landing * (0.35 + motion.speed * 0.25) * reduced;
+    this.roll.velocity += (left.impact - right.impact) * 0.6 * reduced;
+    springStep(this.bounce, dt, 11, 0.35);
+    springStep(this.roll, dt, 13, 0.4);
     const compression = Math.max(0, this.compression.value);
     const release = Math.max(0, -this.compression.value);
     const acceleration = THREE.MathUtils.clamp(motion.acceleration, -1.5, 1.5);
     if (this.bodyBone) {
-      // The animated body pivot leaves the feet planted. The mixer restores
-      // its authored rotation each frame before these small additions.
+      // The animated body pivot leaves the feet planted (they have their own
+      // bones). The mixer restores the authored pose each frame before these
+      // small additions.
       this.bodyBone.rotateX((motion.speed * 0.045 + acceleration * 0.028) * reduced * (1 - stumbleEnvelope));
+      this.bodyBone.rotateY(THREE.MathUtils.clamp(this.roll.value, -0.04, 0.04) * reduced);
+      this.bodyBone.position.setComponent(BODY_UP_AXIS, this.bodyBone.position.getComponent(BODY_UP_AXIS)
+        + THREE.MathUtils.clamp(this.bounce.value, -0.06, 0.14) * reduced);
+      // A slow breath at rest, on top of the authored idle.
+      this.breathPhase = (this.breathPhase + dt * 1.6) % (Math.PI * 2);
+      const breath = (0.5 - 0.5 * Math.cos(this.breathPhase)) * (1 - motion.locomotion) * reduced;
+      this.bodyBone.scale.setComponent(BODY_UP_AXIS,
+        this.bodyBone.scale.getComponent(BODY_UP_AXIS) * (1 + 0.012 * breath));
     }
+    this.updateFace(dt, sprint, stumbleEnvelope, status, reduced);
     if (this.body?.morphTargetInfluences) {
       if (this.squashIndex !== undefined) {
         this.body.morphTargetInfluences[this.squashIndex] = Math.min(0.18,
@@ -234,6 +289,46 @@ export class PipMotion {
     return false;
   }
 
+  /** Eye openness and width: expression from existing signals, times blinks. */
+  private updateFace(dt: number, sprint: number, stumble: number, status: PipStatus, reduced: number) {
+    // Concentrated squint at speed, squeezed shut through a stumble, wide at the finish.
+    let open = 1 - 0.28 * sprint;
+    let width = 1;
+    if (status === "finished") { open = 1.15; width = 1.12; }
+    open = THREE.MathUtils.lerp(open, 0.12, stumble);
+    width = THREE.MathUtils.lerp(width, 1.15, stumble);
+    // Reduced motion keeps the modeled eyes; the damping still avoids a snap.
+    if (!reduced) { open = 1; width = 1; }
+    this.eyeOpen = THREE.MathUtils.damp(this.eyeOpen, open, 10, dt);
+    this.eyeWidth = THREE.MathUtils.damp(this.eyeWidth, width, 10, dt);
+
+    let blink = 1;
+    if (reduced) {
+      this.blinkClock += dt;
+      if (this.blinkTime < 0 && this.blinkClock >= this.nextBlink) {
+        this.blinkTime = 0;
+        this.blinkCount++;
+        this.doubleBlink = blinkHash(this.blinkCount + 100) > 0.8;
+        this.blinkClock = 0;
+        this.nextBlink = blinkInterval(this.blinkCount);
+      }
+      if (this.blinkTime >= 0) {
+        this.blinkTime += dt;
+        const t = Math.min(1, this.blinkTime / BLINK_DURATION);
+        blink = 1 - 0.95 * Math.sin(Math.PI * t) ** 2;
+        if (t >= 1) {
+          // Now and then a second blink follows straight away.
+          this.blinkTime = this.doubleBlink ? 0 : -1;
+          this.doubleBlink = false;
+        }
+      }
+    } else {
+      this.blinkTime = -1;
+    }
+    this.face.uEyeOpen.value = this.eyeOpen * blink;
+    this.face.uEyeWidth.value = this.eyeWidth;
+  }
+
   dispose() {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.model);
@@ -242,5 +337,6 @@ export class PipMotion {
       if (this.stretchIndex !== undefined) this.body.morphTargetInfluences[this.stretchIndex] = 0;
     }
     this.signals.contacts.ready = false;
+    this.face.uEyeOpen.value = this.face.uEyeWidth.value = 1;
   }
 }
