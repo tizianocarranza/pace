@@ -191,6 +191,16 @@ export const landscapeFragment = /* glsl */ `
       #ifdef FOREGROUND
         color = mix(color, pearl, 0.32 * slope);
         color = mix(color, uCoolLight, studioCard(reflection, uCoolDirection, 0.15) * 0.38);
+        // The defocused near layer frames the shot with saturated color: cobalt
+        // on the left, peach rising into lavender on the right. Distant pieces
+        // sharing this finish (z < 0) keep the pearl look.
+        float nearLayer = smoothstep(5.0, 7.0, vWorld.z);
+        float side = smoothstep(1.5, 5.5, vWorld.x);
+        vec3 coolBlob = mix(uBlue, uDeep, 0.3);
+        vec3 warmBlob = mix(uWarm, uViolet, smoothstep(0.2, 2.8, vWorld.y) * 0.3);
+        vec3 vivid = mix(coolBlob, warmBlob, side);
+        vivid = mix(vivid * mix(0.85, 1.0, side), mix(vivid, uPearl, 0.18), light);
+        color = mix(color, vivid, nearLayer);
       #else
         float path = 1.0 - smoothstep(0.65, 3.3, abs(vWorld.z + 0.1));
         color = mix(color, uPearl, path * 0.48);
