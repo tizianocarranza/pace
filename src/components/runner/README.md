@@ -14,7 +14,13 @@ per-frame motion updates.
 The controller blends the unchanged Idle/Run clips continuously, then adds small
 body-pivot lean and existing Squash/Stretch morph weights. A damped compression
 spring responds to actual landings. Stumble temporarily interrupts momentum;
-additional errors cannot restart a stumble that is already recovering.
+additional errors cannot restart a stumble that is already recovering. The dip
+comes from the damped speed target (faster damping while stumbling), never a cut
+in one frame, and the clip eases in over its first 20% at 1.15× speed. The Run
+cadence is itself damped, so the clip never changes tempo in a single frame;
+`check-pip-motion` asserts no per-frame jump in speed or tempo through a stumble.
+The Stumble clip itself has continuous velocity and is sampled at 60 fps (see
+`assets/pip/README.md`).
 
 `pipContacts` samples the two skinned sole vertices once per frame. Each foot
 exposes position, height, hysteretic grounded state, a one-frame impact strength,
@@ -35,7 +41,8 @@ compression before recovery, using the original rig and morph targets.
 Pip's face and follow-through live in the same controller. Eye shape is written
 to `pipFace.ts` uniforms and applied in the eye shader (`usePipSurface`), which
 scales each eye about its own center before skinning. Blinks come every 2–5 s
-from a deterministic sequence (sometimes doubled), plus one on starting. The
+from a deterministic sequence (sometimes doubled), plus one on starting. Each
+lasts 0.28 s, closing over the first 40% and opening more slowly. The
 expression follows existing signals only: a concentrated squint at sprint, eyes
 squeezed shut through a stumble, wide eyes at the finish. A softer bounce spring
 sinks the body a beat after each landing and pops it up on starting and at the

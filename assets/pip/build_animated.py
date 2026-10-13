@@ -126,7 +126,7 @@ for obj in meshes:
 for bone in rig.pose.bones:
     bone.rotation_mode = "QUATERNION"
 rig.animation_data_create()
-scene.render.fps = 30
+scene.render.fps = 60
 scene.render.fps_base = 1.0
 
 
@@ -175,10 +175,20 @@ def run(t):
 
 
 def curve(t, knots):
-    for (a, x), (b, y) in zip(knots, knots[1:]):
+    # Cubic Hermite through the knots with continuous velocity. An ease per
+    # segment stopped the motion at every knot, so the stumble moved in jerks.
+    # Catmull-Rom tangents for uneven spacing; the ends start and stop at rest.
+    def tangent(k):
+        if k == 0 or k == len(knots) - 1:
+            return 0.0
+        return (knots[k + 1][1] - knots[k - 1][1]) / (knots[k + 1][0] - knots[k - 1][0])
+    for k, ((a, x), (b, y)) in enumerate(zip(knots, knots[1:])):
         if t <= b:
-            u = smoother(a, b, t)
-            return x + (y - x) * u
+            h = b - a
+            u = max(0.0, min(1.0, (t - a) / h))
+            u2, u3 = u * u, u * u * u
+            return ((2 * u3 - 3 * u2 + 1) * x + (u3 - 2 * u2 + u) * h * tangent(k)
+                    + (-2 * u3 + 3 * u2) * y + (u3 - u2) * h * tangent(k + 1))
     return knots[-1][1]
 
 
@@ -194,7 +204,8 @@ def evaluated_min_z():
     return lowest
 
 
-def stumble(t):
+def stumble(t, lift=None):
+    """Poses the stumble. Without `lift`, returns the floor lift this pose needs."""
     angle = math.radians(curve(t, [(0, 0), (.11, -6), (.23, 24), (.36, 75),
                                   (.46, 103), (.55, 83), (.72, 25), (.88, -7), (1, 0)]))
     impact = curve(t, [(0, 0), (.39, 0), (.47, 1), (.62, 0), (1, 0)])
@@ -210,20 +221,39 @@ def stumble(t):
     pose_bone("Root", offset, (angle, 0, 0))
     # Bone-only impact keeps runtime morph weights independent. Sample actual
     # deformed meshes to let the forward tumble touch rather than cross ground.
-    floor = evaluated_min_z()
-    rig.pose.bones["Root"].location.z += max(0, -floor) + air
+    if lift is None:
+        return max(0, -evaluated_min_z())
+    rig.pose.bones["Root"].location.z += lift + air
+
+
+def smoothed_floor_lifts(frames):
+    """Per-frame floor lifts, dilated (never through the floor) then blurred, so
+    the contact correction no longer zigzags the body from one frame to the next."""
+    raw = []
+    for frame in range(frames + 1):
+        reset_pose()
+        raw.append(stumble(frame / frames))
+    at = lambda i: max(0, min(frames, i))
+    dilated = [max(raw[at(i + j)] for j in range(-2, 3)) for i in range(frames + 1)]
+    return [sum(w * dilated[at(i + j)] for j, w in zip(range(-2, 3), (1, 4, 6, 4, 1))) / 16
+            for i in range(frames + 1)]
 
 
 actions = {}
-for name, duration_frames, function in (("Idle", 96, idle), ("Run", 24, run), ("Stumble", 36, stumble)):
+# Sampled at 60 fps: the glTF keys are linearly interpolated at runtime.
+for name, duration_frames, function in (("Idle", 192, idle), ("Run", 48, run), ("Stumble", 72, stumble)):
     action = bpy.data.actions.new(name)
     action.use_fake_user = True
+    lifts = smoothed_floor_lifts(duration_frames) if name == "Stumble" else None
     rig.animation_data.action = action
     for frame in range(duration_frames + 1):
         # Exact duplicate endpoint prevents trig roundoff in seamless loops.
         t = (0.0 if frame == duration_frames and name != "Stumble" else frame / duration_frames)
         reset_pose()
-        function(t)
+        if lifts is None:
+            function(t)
+        else:
+            function(t, lifts[frame])
         if name == "Stumble" and frame in (0, duration_frames):
             reset_pose()
         for bone in rig.pose.bones:
@@ -248,7 +278,7 @@ for name, action in actions.items():
     strip.extrapolation = "NOTHING"
     track.mute = True
 reset_pose()
-scene.frame_start, scene.frame_end = 0, 96
+scene.frame_start, scene.frame_end = 0, 192
 scene.frame_set(0)
 character["phase"] = "Production animated asset | approved static shape preserved"
 character["source_sha256"] = SOURCE_HASH
