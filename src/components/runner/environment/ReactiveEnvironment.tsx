@@ -21,6 +21,7 @@ import { useAtmosphere } from "../AtmosphereStudy";
 import { useEnergySelection } from "../EnergyStudy";
 import { WorldEnergy } from "./worldEnergy";
 import { EnvironmentEnergy } from "./EnvironmentEnergy";
+import { LightTrails } from "./LightTrails";
 
 /** A fixed window into a continuous landscape, independent of Pip's placement. */
 export function ReactiveEnvironment({ motion, status }: {
@@ -150,6 +151,7 @@ export function ReactiveEnvironment({ motion, status }: {
       </group>
       <EnvironmentDetails surfaces={surfaces} world={controller} />
       <EnvironmentEnergy surfaces={surfaces} enabled={energyMode === "on" && !composition.gray} />
+      <LightTrails surfaces={surfaces} enabled={energyMode === "on" && !composition.gray} />
     </group>
   );
 }

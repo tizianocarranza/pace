@@ -142,7 +142,8 @@ export const landscapeFragment = /* glsl */ `
     #if MATERIAL_KIND == 3
       vec3 facet = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
       if (dot(facet, view) < 0.0) facet = -facet;
-      n = normalize(mix(n, facet, 0.28));
+      // Crisp gem facets: each flat face catches the light on its own.
+      n = normalize(mix(n, facet, 0.85));
     #endif
     float nv = max(dot(n, view), 0.0);
     float fresnel = pow(1.0 - nv, 3.0);
@@ -190,6 +191,16 @@ export const landscapeFragment = /* glsl */ `
       #ifdef FOREGROUND
         color = mix(color, pearl, 0.32 * slope);
         color = mix(color, uCoolLight, studioCard(reflection, uCoolDirection, 0.15) * 0.38);
+        // The defocused near layer frames the shot with saturated color: cobalt
+        // on the left, peach rising into lavender on the right. Distant pieces
+        // sharing this finish (z < 0) keep the pearl look.
+        float nearLayer = smoothstep(5.0, 7.0, vWorld.z);
+        float side = smoothstep(1.5, 5.5, vWorld.x);
+        vec3 coolBlob = mix(uBlue, uDeep, 0.3);
+        vec3 warmBlob = mix(uWarm, uViolet, smoothstep(0.2, 2.8, vWorld.y) * 0.3);
+        vec3 vivid = mix(coolBlob, warmBlob, side);
+        vivid = mix(vivid * mix(0.85, 1.0, side), mix(vivid, uPearl, 0.18), light);
+        color = mix(color, vivid, nearLayer);
       #else
         float path = 1.0 - smoothstep(0.65, 3.3, abs(vWorld.z + 0.1));
         color = mix(color, uPearl, path * 0.48);
@@ -201,42 +212,65 @@ export const landscapeFragment = /* glsl */ `
       #ifdef WARM_ACCENT
         tint = mix(tint, uWarm, 0.42 + smoothstep(-0.15, 0.75, n.x + n.y * 0.5) * 0.53);
       #endif
-      color = mix(tint * 0.67, uPearl, 0.1 + 0.33 * light);
+      // Little pearl: a linear mix with white reads grey/pastel on screen.
+      color = mix(tint * 0.85, uPearl, 0.06 + 0.16 * light);
       color = mix(color, tint * (0.9 + thin * 0.25), thin * 0.42);
       float reflectionBand = studioCard(reflection, uKeyDirection, 0.075);
       color = mix(color, vec3(1.08, 1.04, 1.01), reflectionBand * 0.7 + fresnel * thin * 0.25);
       transmission = thin * (0.25 + 0.75 * warmBacklight);
       alpha = 0.78 + 0.18 * fresnel - thin * 0.22;
     #elif MATERIAL_KIND == 2
-      // Approximate thickness-dependent absorption; background remains visible through the arch.
-      float thickness = (0.35 + nv * 1.25) * (1.0 - 0.4 * smoothstep(0.0, 4.5, vLocal.y));
-      vec3 absorption = exp(-vec3(1.8, 0.85, 0.34) * thickness);
-      color = mix(uDeep * 0.72, uBlue, 0.14 + light * 0.48);
-      color = mix(color, absorption, 0.02 + light * 0.06);
-      float milk = exp(-thickness * 2.0);
-      color = mix(color, mix(uViolet, uPearl, milk), 0.12 + fresnel * 0.3);
-      transmission = exp(-thickness * 1.5) * (0.2 + warmBacklight * 0.8);
-      float wide = studioCard(reflection, uKeyDirection, 0.085);
-      float edgeLight = studioCard(reflection, uCoolDirection, 0.026);
-      float front = studioCard(reflection, vec3(0.12, 0.2, 1.0), 0.025);
-      color = mix(color, mix(uCoolLight, vec3(1.15), 0.8), min(0.96, wide * 0.75 + edgeLight * 0.55 + front * 0.36 + fresnel * 0.16));
-      color += mix(uWarmLight, vec3(1.0), 0.32) * pow(transmission, 1.2) * 0.7;
-      alpha = 0.45 + 0.34 * fresnel + 0.1 * thickness;
+      // Thick glass band: a clear face, saturated color where the optical path
+      // lengthens toward the edges, cobalt grading into peach along the span.
+      float thickness = (0.35 + (1.0 - nv) * 1.6) * (1.0 - 0.3 * smoothstep(0.0, 4.5, vLocal.y));
+      float span = smoothstep(-0.6, 0.9, sin(vLocal.x * 0.55 + vLocal.y * 0.32 + 0.4));
+      // Eased (not linear) so the middle of the span does not turn mauve.
+      vec3 glassTint = mix(mix(uDeep, uBlue, 0.55), uWarm, smoothstep(0.1, 1.0, span) * 0.8);
+      // Mixing is linear: even a little white reads as pastel in sRGB.
+      vec3 absorption = mix(vec3(1.0), glassTint, 0.88 + 0.12 * (1.0 - exp(-thickness * 1.4)));
+      // Light passing straight through the face glows; edges hold the color.
+      color = mix(absorption, mix(absorption, vec3(1.0), 0.28), nv * nv);
+      color = mix(color, uDeep, pow(fresnel, 2.0) * 0.45 * (1.0 - span));
+      // Kept low: shared warm mixing below reads transmission as a pink veil.
+      transmission = exp(-thickness * 1.2) * (0.08 + warmBacklight * 0.3);
+      // Sparse internal streaks: a few fine refracted lines along the band.
+      float streakPhase = vLocal.y * 5.5 + vLocal.x * 1.7 + sin(vLocal.x * 3.1 + vLocal.y) * 1.4;
+      float streaks = pow(abs(sin(streakPhase)), 90.0) * step(0.7, fract(streakPhase * 0.159 + 0.2));
+      color = mix(color, vec3(1.1), streaks * (0.2 + 0.3 * fresnel));
+      // Narrow highlights and bright rims; a broad lobe would bleach the face.
+      float wide = studioCard(reflection, uKeyDirection, 0.04);
+      float edgeLight = studioCard(reflection, uCoolDirection, 0.02);
+      float front = studioCard(reflection, vec3(0.12, 0.2, 1.0), 0.02);
+      color = mix(color, mix(uCoolLight, vec3(1.15), 0.8), min(0.92, wide * 0.7 + edgeLight * 0.6 + front * 0.35 + pow(fresnel, 4.0) * 0.6));
+      color += mix(uWarmLight, vec3(1.0), 0.32) * pow(transmission, 1.2) * 0.5;
+      alpha = 0.74 + 0.22 * fresnel;
+      // Thin rings read as clear, bright glass lines with cool edges.
+      color = mix(color, mix(mix(uViolet, vec3(1.05), 0.6), uBlue, fresnel * 0.5), vFilament * 0.85);
+    #elif MATERIAL_KIND == 5
+      // Thin-film bubble: a nearly clear center, an iridescent peach/lavender
+      // rim that shifts with view angle, and one small hard highlight.
+      float film = 0.5 + 0.5 * sin((1.0 - nv) * 7.5 + vWorld.y * 0.6);
+      vec3 rim = mix(mix(uWarm, uViolet, film), uBlue, smoothstep(0.75, 1.0, film) * 0.4);
+      color = mix(mix(uViolet, uWarm, film * 0.5), rim, smoothstep(0.1, 0.8, 1.0 - nv));
+      float glint = studioCard(reflection, uKeyDirection, 0.012);
+      color = mix(color, vec3(1.15), min(1.0, glint * 1.2 + pow(fresnel, 5.0) * 0.4));
+      alpha = 0.5 + 0.45 * smoothstep(0.1, 0.9, 1.0 - nv) + glint * 0.5;
     #else
-      // Polished artifacts share the mineral palette, with one amber-pearl accent.
-      vec3 body = mix(uDeep, uBlue, light * 0.7);
+      // Faceted cobalt crystals: dark body, narrow flashes on single facets.
+      vec3 body = mix(uDeep * 0.8, uBlue, light * 0.8);
       #ifdef WARM_ACCENT
         body = mix(uWarm * 0.65, uWarm, light);
       #endif
-      color = mix(body, pearl, fresnel * 0.5);
-      float broad = studioCard(reflection, uKeyDirection, 0.10);
-      float small = studioCard(reflection, uCoolDirection, 0.035);
-      color = mix(color, uPearl, min(0.95, broad * 0.65 + small * 0.36 + fresnel * 0.22));
+      color = mix(body, pearl, fresnel * 0.4);
+      float broad = studioCard(reflection, uKeyDirection, 0.05);
+      float small = studioCard(reflection, uCoolDirection, 0.02);
+      color = mix(color, uPearl, min(0.95, broad * 0.8 + small * 0.5 + fresnel * 0.18));
       transmission = (0.12 + fresnel * 0.28) * warmBacklight;
     #endif
 
     // Shared colored irradiance unifies the family; transmitted light is not a glow halo.
-    color *= vec3(0.68 + light * 0.28) + uWarmLight * warmEnergy * 0.10 + uCoolLight * coolEnergy * 0.10;
+    // Shading lifts toward white rather than sinking into grey mid-tones.
+    color *= vec3(0.80 + light * 0.22) + uWarmLight * warmEnergy * 0.10 + uCoolLight * coolEnergy * 0.10;
     float warmReflection = studioCard(reflection, uWarmDirection, 0.14);
     color = mix(color, uWarmLight, min(0.5, warmEnergy * 0.035 + warmReflection * 0.24 + transmission * 0.45));
     color = mix(color, uCoolLight, coolEnergy * (0.025 + fresnel * 0.12));
@@ -286,11 +320,11 @@ export const landscapeFragment = /* glsl */ `
     #endif
     float farFade = smoothstep(29.0, 37.0, -vWorld.z);
     float edge = smoothstep(28.0, 35.0, abs(vWorld.x));
-    #if MATERIAL_KIND > 0 && MATERIAL_KIND < 4
+    #if MATERIAL_KIND > 0 && MATERIAL_KIND != 4
       edge = max(edge, smoothstep(24.0, 34.0, abs(vObjectX)));
     #endif
     vec2 screen = gl_FragCoord.xy / uResolution;
-    float frame = smoothstep(0.12, 0.20, screen.y) * (1.0 - smoothstep(0.67, 0.77, screen.y));
+    float frame = smoothstep(0.15, 0.26, screen.y) * (1.0 - smoothstep(0.67, 0.77, screen.y));
     // Crop at the viewport sides: a screen-edge fade made the world read as a
     // rectangular panel and erased the strongest near-plane depth cue.
     // Preserve the actual central sentence area, while letting cropped side
@@ -303,13 +337,13 @@ export const landscapeFragment = /* glsl */ `
     float presence = (1.0 - nearFade) * (1.0 - farFade) * (1.0 - edge) * frame * uVisibility;
     // Neutral study mode uses this same shader/geometry, without new materials.
     color = mix(color, vec3(0.22 + 0.66 * light), uCompositionGray);
-    #if MATERIAL_KIND == 1 || MATERIAL_KIND == 2
+    #if MATERIAL_KIND == 1 || MATERIAL_KIND == 2 || MATERIAL_KIND == 5
       gl_FragColor = vec4(color, alpha * presence);
     #else
       gl_FragColor = vec4(color, 1.0);
     #endif
     #include <tonemapping_fragment>
-    #if MATERIAL_KIND != 1 && MATERIAL_KIND != 2
+    #if MATERIAL_KIND != 1 && MATERIAL_KIND != 2 && MATERIAL_KIND != 5
       #ifdef FOREGROUND
         if (uNearCapture > 0.5) {
           // Linear premultiplied coverage: blur never samples a white backdrop.

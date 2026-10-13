@@ -3,6 +3,8 @@ import { PIP_FLOOR_Y } from "../pipContacts";
 
 export const WORLD_PERIOD = 72;
 export const GROUND_Y = PIP_FLOOR_Y - 0.018;
+// The world reads as a thin glossy sheet with low swells, not a field of dunes.
+export const TERRAIN_RELIEF = 0.32;
 
 // Center, width, base/amplitude, lateral drift/frequency, height frequency/phase, bank skew.
 // Broad masses carry a few narrow shoulders and incised channels. No random noise.
@@ -28,8 +30,8 @@ export function terrainHeight(x: number, z: number) {
   }
   const nearP = (z - 2.5 - 0.25 * Math.sin(phase * 6)) / 0.75;
   const near = (0.2 + 0.3 * (0.5 + 0.5 * Math.cos(phase * 5))) * Math.exp(-nearP * nearP);
-  return GROUND_Y + (1 - MathUtils.smoothstep(z, -2.5, -1.15)) * height
-    + near * MathUtils.smoothstep(z, 0.8, 1.6);
+  return GROUND_Y + TERRAIN_RELIEF * ((1 - MathUtils.smoothstep(z, -2.5, -1.15)) * height
+    + near * MathUtils.smoothstep(z, 0.8, 1.6));
 }
 
 const glsl = (value: number) => value.toFixed(6);
@@ -48,7 +50,7 @@ export const terrainField = /* glsl */ `
     float height = ${BANDS.map(band => `terrainBand(phase, p.y, ${band.map(glsl).join(", ")})`).join("\n      + ")};
     float nearP = (p.y - 2.5 - 0.25 * sin(phase * 6.0)) / 0.75;
     float near = (0.2 + 0.3 * (0.5 + 0.5 * cos(phase * 5.0))) * exp(-nearP * nearP);
-    return ${glsl(GROUND_Y)} + (1.0 - smoothstep(-2.5, -1.15, p.y)) * height
-      + near * smoothstep(0.8, 1.6, p.y);
+    return ${glsl(GROUND_Y)} + ${glsl(TERRAIN_RELIEF)} * ((1.0 - smoothstep(-2.5, -1.15, p.y)) * height
+      + near * smoothstep(0.8, 1.6, p.y));
   }
 `;

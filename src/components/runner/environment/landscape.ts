@@ -107,14 +107,16 @@ export function createFormation(form: Formation) {
     return surface(80, 16, (u, v) => {
       const angle = u * Math.PI;
       const rise = Math.sin(angle);
-      // A broad loaded shoulder and a narrow return, rather than a uniform tube.
+      // A thick glass band: broad flat faces, thin depth and softened edges
+      // (superellipse section), swelling slightly on one shoulder.
       // OuterBridge is a lower, wider vault; the distant arch stays restrained.
       const shoulder = Math.exp(-(((u - (outer ? 0.66 : 0.28)) / 0.22) ** 2));
-      const breadth = 0.14 + 0.42 * (1 - rise) ** 2 + shoulder * (distant ? 0.22 : 0.75);
+      const breadth = (distant ? 0.3 : 0.42) + 0.12 * (1 - rise) ** 2 + shoulder * (distant ? 0.08 : 0.2);
       const section = v * TAU;
       const turn = (outer ? -0.65 : 0.85) * Math.sin(angle) - 0.25;
-      const across = Math.cos(section) * breadth;
-      const depth = Math.sin(section) * form.depth * (0.13 + 0.22 * rise);
+      const squircle = (value: number) => Math.sign(value) * Math.abs(value) ** 0.45;
+      const across = squircle(Math.cos(section)) * breadth;
+      const depth = squircle(Math.sin(section)) * form.depth * (0.1 + 0.04 * rise);
       const radial = across * Math.cos(turn) - depth * Math.sin(turn);
       const x = Math.cos(angle) * form.width + rise * form.width * (outer ? -0.14 : 0.24)
         + radial * Math.cos(angle);

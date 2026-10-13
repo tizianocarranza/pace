@@ -5,6 +5,9 @@ const vertexShader = `
   void main() { vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }
 `;
 
+// Tap spacing in CSS pixels; with two passes this gives roughly 20px of softness.
+const FOREGROUND_STEP = 4.5;
+
 /** Only the authored near layer enters these buffers. Pip is always drawn sharp. */
 export class ForegroundSoftness {
   private readonly source: THREE.WebGLRenderTarget;
@@ -89,7 +92,8 @@ export class ForegroundSoftness {
     if (!visible) { drawSharp(); return; }
 
     gl.getDrawingBufferSize(this.size);
-    this.size.multiplyScalar(Math.min(0.5, 1024 / Math.max(this.size.x, this.size.y))).floor();
+    // Quarter resolution is plenty for a lens-like defocus and keeps it cheap.
+    this.size.multiplyScalar(Math.min(0.25, 512 / Math.max(this.size.x, this.size.y))).floor();
     this.size.set(Math.max(1, this.size.x), Math.max(1, this.size.y));
     this.source.setSize(this.size.x, this.size.y);
     this.scratch.setSize(this.size.x, this.size.y);
@@ -110,13 +114,16 @@ export class ForegroundSoftness {
       this.capture.value = 0;
 
       this.quad.material = this.blur;
-      this.blur.uniforms.uImage.value = this.source.texture;
       // CSS-pixel radius stays consistent across DPR and capped target sizes.
-      this.blur.uniforms.uStep.value.set(1.75 / this.cssSize.x, 0);
-      gl.setRenderTarget(this.scratch); gl.render(this.screen, this.camera);
-      this.blur.uniforms.uImage.value = this.scratch.texture;
-      this.blur.uniforms.uStep.value.set(0, 1.75 / this.cssSize.y);
-      gl.setRenderTarget(this.source); gl.render(this.screen, this.camera);
+      // Two separable passes approach a wide, smooth bokeh-like defocus.
+      for (let pass = 0; pass < 2; pass++) {
+        this.blur.uniforms.uImage.value = this.source.texture;
+        this.blur.uniforms.uStep.value.set(FOREGROUND_STEP / this.cssSize.x, 0);
+        gl.setRenderTarget(this.scratch); gl.render(this.screen, this.camera);
+        this.blur.uniforms.uImage.value = this.scratch.texture;
+        this.blur.uniforms.uStep.value.set(0, FOREGROUND_STEP / this.cssSize.y);
+        gl.setRenderTarget(this.source); gl.render(this.screen, this.camera);
+      }
       this.quad.material = this.composite;
       gl.setRenderTarget(target); gl.setViewport(this.viewport);
       gl.setScissor(this.scissor); gl.setScissorTest(scissorTest); gl.autoClear = false;

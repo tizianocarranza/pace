@@ -86,7 +86,8 @@ const { DETAIL_REGIONS, createDetailBatches, createDetailGeometry } =
   await import(pathToFileURL(path.join(compiled, 'detailClusters.mjs')));
 const batches = createDetailBatches();
 assert.deepEqual(batches, createDetailBatches(), 'art-directed placements are deterministic');
-assert(batches.length <= 9, 'detail draws stay bounded by shared geometry/finish pairs');
+// Phase 4 (target density) adds sphere/petal shapes and a bubble finish.
+assert(batches.length <= 14, 'detail draws stay bounded by shared geometry/finish pairs');
 const matrix = new THREE.Matrix4(), point = new THREE.Vector3();
 let detailTriangles = createDetailGeometry('mineral').indices.length / 3;
 let details = 0;
@@ -104,7 +105,7 @@ for (const batch of batches) {
     for (let i = 0; i < data.positions.length; i += 3) {
       point.fromArray(data.positions, i).applyMatrix4(matrix);
       assert(Math.abs(point.z) > 0.85, 'physical lane stays clear on both sides; projected overlap is permitted');
-      if (batch.shape === 'mineral') continue;
+      if (batch.shape === 'mineral' || batch.shape === 'sphere') continue;
       const root = terrainHeight(point.x, point.z);
       for (const travel of [0, 7, 39, 71]) {
         const world = new LandscapeMotion(); world.travel = travel;
@@ -115,7 +116,7 @@ for (const batch of batches) {
     }
   }
 }
-assert(details < 45 && detailTriangles < 16_000, 'bounded detail and triangle counts');
+assert(details < 110 && detailTriangles < 32_000, 'bounded detail and triangle counts');
 assert(DETAIL_REGIONS.filter(region => Math.abs(region.x) > 15).length >= 2,
   'authored regions continue beyond the starting view');
 console.log(`Details passed: ${details} instances, ${batches.length + 1} draws including the near fragment, ${detailTriangles} triangles; shared buffers, deterministic placement, clear corridor and rooted looping geometry.`);

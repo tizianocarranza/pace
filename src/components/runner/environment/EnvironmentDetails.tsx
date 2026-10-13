@@ -3,7 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
-import { createDetailBatches, createDetailGeometry } from "./detailClusters";
+import { createDetailBatches, createDetailGeometry, floats } from "./detailClusters";
 import { type createLandscapeMaterials } from "./landscapeMaterials";
 import { FRAGMENT_RATE, type LandscapeMotion } from "./worldMotion";
 import { COMPOSITION_STUDIES, heightAtScreen, nearPassX } from "../composition";
@@ -25,10 +25,11 @@ export function EnvironmentDetails({ surfaces, world }: {
       geometry.setAttribute("normal", new THREE.BufferAttribute(data.normals, 3));
       geometry.setIndex(new THREE.BufferAttribute(data.indices, 1));
       geometry.setAttribute("detailGrounded", new THREE.BufferAttribute(
-        new Float32Array(data.positions.length / 3).fill(shape === "mineral" ? 0 : 1), 1));
+        new Float32Array(data.positions.length / 3).fill(floats(shape) ? 0 : 1), 1));
       return geometry;
     };
-    return { mineral: make("mineral"), sheet: make("sheet"), lens: make("lens"), filament: make("filament") };
+    return { mineral: make("mineral"), sheet: make("sheet"), lens: make("lens"), filament: make("filament"),
+      sphere: make("sphere"), petal: make("petal") };
   }, []);
   const instancedGeometry = useMemo(() => batches.map(batch => {
     const shared = geometries[batch.shape];

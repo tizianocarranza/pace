@@ -1,6 +1,55 @@
 # Landscape and material family
 
-## Phase 5 motion and visual energy (current)
+## Target art direction pass (current)
+
+A seven-step pass moved the world and Pip toward the reference image kept
+locally in `target/` (Git-ignored). It deliberately supersedes three earlier
+decisions: no bloom (Phase 4), no motes (Phase 5) and the small detail budget
+(Phase 3). The Study B camera and formation anchors are unchanged.
+
+1. **Palette and light.** `StudioEnvironment` uses `NeutralToneMapping`; ACES
+   greyed the high-key field and desaturated the accents. Landscape colors are a
+   near-white pearl with saturated cobalt, periwinkle and peach. A periwinkle
+   hemisphere bounce plus stronger warm/cool rims give Pip colored volume. The
+   pilot ground scales and partly desaturates its image-based light in its own
+   shader, because `scene.environment` ignores `material.envMapIntensity`.
+   Several shaders previously mixed white in linear space, which reads pastel or
+   grey on screen; tints are now applied with little or no white.
+2. **Ground.** `TERRAIN_RELIEF` (0.32) scales the shared CPU/GPU field, so the
+   dunes become low swells and the world sits in a horizontal band. Formations
+   and rooted details follow automatically; the walking corridor stays level.
+   The pilot floor is a thin glossy sheet (roughness 0.14–0.3, clearcoat 0.8).
+   The bottom screen fade starts higher and distance haze reaches 84% at 28 units.
+3. **Glass arches.** Arches are thick bands with a superellipse section. Kind 2
+   is a glass shader: eased cobalt-to-peach gradient along the span, brighter
+   face center, narrow highlights and sparse internal streaks. Two thin glass
+   rings (`filament`) sweep over the formations.
+4. **Details.** Crystals use hard facets (85% face normal). New shapes: `sphere`
+   (floating, like minerals) and `petal` (rooted blades). New finish: `bubble`
+   (kind 5, thin-film iridescence). 46 deterministic motes span the whole loop,
+   all behind the lane. `check-environment` budgets are now ≤14 detail batches,
+   <110 instances and <32k detail triangles (89 / 14 / ~24.8k at present).
+5. **Light trails.** `LightTrails` draws 14 ground-level ribbons that flow
+   backward faster than the floor, driven by `uEnergy.x`. A white core, a glow
+   and a saturated halo are built into each streak: a selective bloom without a
+   render target. One draw, about 900 triangles, skipped at idle.
+6. **Foreground.** The near layer (z ≈ 9) is cobalt on the left and peach into
+   lavender on the right; distant pieces sharing the finish keep the pearl look.
+   `ForegroundSoftness` now runs two separable passes at quarter resolution
+   (512 px long-edge cap), roughly 20 CSS px of softness.
+7. **Pip.** Glossy clearcoated eyes; a faint cool sheen and a partly desaturated
+   image-based light on the body. `usePipReflection` adds a mirrored copy bound to
+   the same skeleton and morphs. Its vertices are slid along the camera ray onto
+   the floor, so the ordinary depth test hides it behind Pip and anything in
+   front, with no stencil buffer or extra pass. It fades within a short distance.
+
+Still open: a real bloom pass for crystal and bubble glints, a stronger glow at
+Pip's feet, denser authored detail in the part of the loop seen while running,
+larger foreground blobs (this would touch the Study B framing) and the Pip model
+itself (eye size, visible feet and tail). Earlier phase notes below describe the
+state before this pass where they disagree with it.
+
+## Phase 5 motion and visual energy (retained)
 
 The Phase 1 composition switch was still forcing energy to zero and leaving
 `EnvironmentEnergy` unmounted. The existing `WorldEnergy` now runs after world
@@ -61,6 +110,8 @@ is rendered separately, filtered horizontally and vertically, then composited
 over the sharp frame. Pip never enters the blur buffers; HTML is outside WebGL.
 This is a selected near-layer treatment, not general depth of field.
 
+(Superseded sizes: the target art direction pass uses quarter resolution, a
+512-pixel cap and two blur passes. The original Phase 4 values follow.)
 Two reusable half-resolution targets have a 1024-pixel long-edge cap, no MSAA
 and no mipmaps. The source has a depth renderbuffer; the blur scratch target
 does not. A 17-tap Gaussian per axis gives approximately six CSS pixels of

@@ -5,8 +5,8 @@ import { FORMATIONS, type LandscapeMotion } from "./landscape";
 export const WORLD_LIGHT = {
   ambient: 1.38,
   key: { color: "#fffaf4", intensity: 1.95, position: [-3.5, 5, 4] as [number, number, number] },
-  warm: { color: "#ffd5b4", intensity: 0.32, position: [-4, 2.5, -3] as [number, number, number] },
-  cool: { color: "#d7e3ff", intensity: 0.38, position: [4, 2, 3] as [number, number, number] },
+  warm: { color: "#ffc596", intensity: 0.32, position: [-4, 2.5, -3] as [number, number, number] },
+  cool: { color: "#c3d2ff", intensity: 0.38, position: [4, 2, 3] as [number, number, number] },
 };
 
 // Bounce sources belong to existing world objects; no new emitters/meshes or particles.
