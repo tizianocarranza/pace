@@ -20,6 +20,7 @@ for (const name of ['pipContacts', 'pipMotion', 'worldInteractions', 'compositio
     .replace('"./pipContacts"', '"./pipContacts.mjs"').replace('"../pipContacts"', '"./pipContacts.mjs"'));
 }
 const { PipMotion } = await import(pathToFileURL(path.join(compiled, 'pipMotion.mjs')));
+const { PIP_SOLE_Y } = await import(pathToFileURL(path.join(compiled, 'pipContacts.mjs')));
 const { frameComposition } = await import(pathToFileURL(path.join(compiled, 'composition.mjs')));
 const { WorldInteractions, IMPULSE_CAPACITY } = await import(pathToFileURL(path.join(compiled, 'worldInteractions.mjs')));
 const data = await fs.readFile('public/models/pip.glb');
@@ -30,7 +31,9 @@ function fixture(aspect = 7.5) {
   const placement = new THREE.Group();
   const center = new THREE.Group();
   placement.add(center); center.add(model);
+  // Same placement as Pip.tsx: centered in x/z, soles at PIP_SOLE_Y.
   center.position.sub(new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3()));
+  center.position.y = PIP_SOLE_Y;
   const camera = new THREE.PerspectiveCamera(30, aspect, 0.1, 1000);
   camera.position.set(0, 1.2, 6); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
   const motion = new PipMotion(model, placement, gltf.animations);

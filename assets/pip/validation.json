@@ -1,7 +1,7 @@
 {
   "phase": "static only",
   "blender": "5.0.1",
-  "revision": "02 | Lower bean silhouette, smaller eyes and tucked feet",
+  "revision": "03 | Taller egg body and larger eyes",
   "reference": "public/references/pip-character-reference.png",
   "objects": [
     {
@@ -10,9 +10,9 @@
       "base_faces": 1120,
       "evaluated_triangles": 8800,
       "dimensions_xyz": [
-        2.22613,
-        2.5839,
-        1.71429
+        2.14663,
+        2.28576,
+        1.9242
       ]
     },
     {
@@ -43,9 +43,9 @@
       "base_faces": 384,
       "evaluated_triangles": 720,
       "dimensions_xyz": [
-        0.17125,
-        0.11323,
-        0.30353
+        0.21325,
+        0.11594,
+        0.38699
       ]
     },
     {
@@ -54,9 +54,9 @@
       "base_faces": 384,
       "evaluated_triangles": 720,
       "dimensions_xyz": [
-        0.17125,
-        0.11323,
-        0.30353
+        0.21325,
+        0.11594,
+        0.38699
       ]
     }
   ],
@@ -67,9 +67,9 @@
   "animations": 0,
   "shape_keys": 0,
   "dimensions_xyz": [
-    2.22613,
-    2.5839,
-    1.74434
+    2.14663,
+    2.28576,
+    1.95425
   ],
   "geometry_checks": "Base and evaluated shells are closed manifold; finite coordinates, consistent outward normals, no degenerate faces",
   "note": "Body and feet are separate intersecting closed shells with hidden roots."

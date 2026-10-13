@@ -26,16 +26,18 @@ args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv
 PREVIEWS.mkdir(parents=True, exist_ok=True)
 
 # Coordinates: X left/right, -Y forward, Z up. Sole baseline is Z=0.
-BODY_RX = 1.12
-BODY_RY = 1.30
-BODY_MID_Z = 0.78
-BODY_TOP_Z = 1.79
+BODY_RX = 1.08
+BODY_RY = 1.15
+BODY_MID_Z = 0.86
+BODY_TOP_Z = 2.0
 BODY_BASE_Z = 0.075
 # Match the upper/lower profile slopes at the widest ring. The powered lower
 # profile carries volume down into the belly and eases into a broad, low base.
 BODY_SETTLE_POWER = (BODY_TOP_Z - BODY_MID_Z) / (BODY_MID_Z - BODY_BASE_Z)
-EYE_Z = 1.07
-EYE_X = 0.285
+EYE_Z = 1.18
+EYE_X = 0.27
+EYE_HEIGHT = 0.198
+EYE_WIDTH = 0.111
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.context.preferences.filepaths.save_version = 0
@@ -158,8 +160,8 @@ def make_eye(sign):
     center = point - normal * 0.007
     def surface(theta, phi):
         radial = math.sin(theta)
-        p = (center + up * (0.158 * math.cos(theta))
-             + across * (0.089 * radial * math.cos(phi))
+        p = (center + up * (EYE_HEIGHT * math.cos(theta))
+             + across * (EYE_WIDTH * radial * math.cos(phi))
              + normal * (0.029 * radial * math.sin(phi)))
         return tuple(p)
     return closed_surface("Pip.Eye." + ("L" if sign < 0 else "R"),
@@ -172,11 +174,11 @@ for obj in character.objects:
     for vertex in obj.data.vertices:
         vertex.co.z -= 0.045
 character["phase"] = "01 | Static geometry, pending visual approval"
-character["revision"] = "02 | Lower bean silhouette, smaller eyes and tucked feet"
+character["revision"] = "03 | Taller egg body and larger eyes"
 character["reference"] = "public/references/pip-character-reference.png"
 character["forward"] = "-Y; up +Z; feet at Z=0"
 character["presentation"] = "Character collection contains only body, two feet, two eyes."
-body["design"] = "Wide forward-biased bean, full settled lower half, softly flattened belly; reference IDLE pose."
+body["design"] = "Taller forward-biased egg, full settled lower half, softly flattened belly; reference IDLE pose."
 
 # Separate review scene, sharing only the character collection with the asset.
 review = bpy.data.scenes.new("Pip | Preview studio")
@@ -274,7 +276,7 @@ def validate_asset():
     assert not bpy.data.actions and not bpy.data.armatures
     assert not any(n.type == "TEX_IMAGE" for mat in (ivory, black) for n in mat.node_tree.nodes)
     result = {"phase": "static only", "blender": bpy.app.version_string,
-              "revision": "02 | Lower bean silhouette, smaller eyes and tucked feet",
+              "revision": "03 | Taller egg body and larger eyes",
               "reference": str(REFERENCE.relative_to(ROOT)).replace("\\", "/"),
               "objects": records,
               "total_evaluated_triangles": sum(r["evaluated_triangles"] for r in records),

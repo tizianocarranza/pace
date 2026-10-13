@@ -19,8 +19,14 @@ export function usePipSurface(scene: THREE.Group) {
       if (!surface) {
         surface = source.clone();
         if (body) {
-          // Preserve the ivory albedo. Two very rough, restrained specular lobes
-          // suggest a soft-touch surface without a shiny coating or texture.
+          // Soft white vinyl: the GLB's ivory albedo read beige against the pale
+          // world. Two very rough, restrained specular lobes suggest a soft-touch
+          // surface without a shiny coating or texture.
+          surface.color.set("#f7f4f1");
+          // Soft vinyl scatters light inside, so its shadows never sink to grey.
+          // A faint lavender lift stands in for that (and the world's bounce).
+          surface.emissive.set("#ebe8f7");
+          surface.emissiveIntensity = 0.2;
           surface.roughness = 0.76;
           surface.ior = 1.46;
           surface.specularIntensity = 0.48;
@@ -28,18 +34,18 @@ export function usePipSurface(scene: THREE.Group) {
           surface.clearcoatRoughness = 0.85;
           // A faint cool sheen at grazing angles reads as soft, slightly
           // translucent vinyl rather than chalk.
-          surface.sheen = 0.45;
-          surface.sheenRoughness = 0.75;
-          surface.sheenColor.set("#ece6ff");
-          // The studio's orange card otherwise tints the back of Pip cream.
-          // Keep its hue as a hint; Pip should read white.
+          surface.sheen = 0.6;
+          surface.sheenRoughness = 0.7;
+          surface.sheenColor.set("#e2dcff");
+          // The studio's orange card otherwise tints the back of Pip cream. Keep
+          // enough of its hue that the shadows take the world's lavender bounce.
           surface.onBeforeCompile = shader => {
             shader.fragmentShader = shader.fragmentShader.replace("#include <lights_fragment_maps>", `
               #include <lights_fragment_maps>
-              iblIrradiance = mix(iblIrradiance, vec3(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722))), 0.65);
+              iblIrradiance = mix(iblIrradiance, vec3(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722))), 0.3);
             `);
           };
-          surface.customProgramCacheKey = () => "pip-body-v2";
+          surface.customProgramCacheKey = () => "pip-body-v3";
         } else {
           // Glossy eyes pick up a small, sharp highlight from the studio key.
           surface.roughness = 0.12;

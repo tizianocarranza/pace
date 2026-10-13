@@ -3,6 +3,7 @@
 import { Center, useGLTF } from "@react-three/drei";
 import { useRef } from "react";
 import * as THREE from "three";
+import { PIP_SOLE_Y } from "./pipContacts";
 import { PipShadow } from "./PipShadow";
 import { ReactiveEnvironment } from "./environment/ReactiveEnvironment";
 import { usePipSurface } from "./usePipSurface";
@@ -32,7 +33,7 @@ export function Pip({ intensity, sustainedInput = false, lastCorrectAt, errorCou
       <ReactiveEnvironment motion={motion} status={status} />
       <PipShadow motion={motion} />
       <group ref={placement} name="PipPlacement">
-        <Center>
+        <Center disableY position-y={PIP_SOLE_Y}>
           <primitive object={scene} />
         </Center>
       </group>

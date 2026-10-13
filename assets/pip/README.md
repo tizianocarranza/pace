@@ -7,7 +7,24 @@ The editable source is **[pip-static.blend](pip-static.blend)**, authored with
 Blender 5.0.1. This is a static model for visual approval, not the final runtime
 asset. No rig, actions, animation, shape keys, GLB, or app integration is included.
 
-## Revision 02 — silhouette review
+## Revision 03 — taller egg and larger eyes (current)
+
+In the game Pip read as a flattened pill with small eyes. This revision moves
+the silhouette toward the reference's egg: the crown rises (`BODY_TOP_Z` 1.79 →
+2.0, `BODY_MID_Z` 0.78 → 0.86), the body is shorter front to back (`BODY_RY`
+1.30 → 1.15) and slightly narrower (`BODY_RX` 1.12 → 1.08). The eyes are about
+25% larger (`EYE_HEIGHT`/`EYE_WIDTH` 0.198/0.111), a little closer together and
+higher (`EYE_X` 0.27, `EYE_Z` 1.18). Feet, base, materials and topology
+(12,672 triangles) are unchanged. The character is now about 1.95 units high.
+
+`build_animated.py` runs unchanged and `validate_glb.py` passes. In the app Pip
+is placed by his soles (`PIP_SOLE_Y` in `src/components/runner/pipContacts.ts`)
+instead of his bounding-box center, so the extra height grows upward and the
+floor, contacts and framing are unchanged. The game's white vinyl finish is a
+runtime material adjustment (`usePipSurface.ts`); the GLB keeps its ivory.
+Revision 02 is preserved in [revisions/02-static](revisions/02-static/).
+
+## Revision 02 — silhouette review (superseded)
 
 This iteration lowers the body by about 8%, increases its frontal width by 7%
 and its front-to-back length by 9%. A fuller lower profile eases into a softly
@@ -48,7 +65,7 @@ profile, so it naturally shows only the nearer eye and overlapping feet.
 
 Mesh names are `Pip.Body`, `Pip.Eye.L`, `Pip.Eye.R`, `Pip.Foot.L`, and
 `Pip.Foot.R`. X is lateral, -Y is forward, and Z is up. Feet share a Z≈0
-baseline. Geometry is approximately 1.74 Blender units high; runtime scale can
+baseline. Geometry is approximately 1.95 Blender units high (1.74 before revision 03); runtime scale can
 be decided in a later phase. Object transforms are identity.
 
 The body has an editable quad-loop cage with a single unapplied Catmull-Clark
