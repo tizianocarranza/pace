@@ -5,6 +5,7 @@ import { type createLandscapeMaterials } from "./landscapeMaterials";
 import { type OpticalUniforms } from "./LayeredOptics";
 import { atmosphereField } from "./atmosphere";
 import { energyField } from "./worldEnergy";
+import { WORLD_LAYERS } from "./worldLayers";
 
 type Shared = ReturnType<typeof createLandscapeMaterials>["terrain"]["uniforms"];
 type Role = "ground" | "sheet" | "mineral";
@@ -13,9 +14,10 @@ type Role = "ground" | "sheet" | "mineral";
  * supplying the existing deformation, thickness estimates and layered capture. */
 export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) {
   const ground = new THREE.MeshPhysicalMaterial({ name: "Pilot / calm ground", color: "#eef0fa",
-    roughness: 0.2, metalness: 0, ior: 1.46, specularIntensity: 0.7,
-    // A thin wet sheet: a sharp clear layer over a slightly softer base.
-    clearcoat: 0.8, clearcoatRoughness: 0.07 });
+    roughness: 0.38, metalness: 0, ior: 1.46, specularIntensity: 0.7,
+    // A satin pearl sheet: a sharp clear coat mirrored the studio cards as
+    // hard streaks across the floor.
+    clearcoat: 0.45, clearcoatRoughness: 0.22 });
   const sheet = new THREE.MeshPhysicalMaterial({ name: "Pilot / thin peach resin", color: "#ffffff",
     roughness: 0.07, metalness: 0, ior: 1.42, transmission: 0.99, thickness: 0.055,
     attenuationColor: "#f3954d", attenuationDistance: 0.09, side: THREE.DoubleSide });
@@ -56,7 +58,7 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
         opticalUniforms.uPilotWorldToLocal.value.copy(object.matrixWorld).invert();
       }
     };
-    material.customProgramCacheKey = () => `pace-pilot-v7-${role}`;
+    material.customProgramCacheKey = () => `pace-pilot-v8-${role}`;
     material.onBeforeCompile = shader => {
       Object.assign(shader.uniforms, uniforms, opticalUniforms, optics);
       if (role === "mineral") shader.uniforms.uOpticalDepth = optics.uOpticalMineralDepth;
@@ -91,13 +93,17 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
         uniform vec3 uPilotRadii;
       ` + shader.fragmentShader;
       const variation = role === "ground" ? `
-        float basin = (0.5 + 0.5 * sin((vPilotWorld.x + uTravel) * 0.42 + vPilotWorld.z * 0.85));
+        // A pearl floor with two or three broad, soft zones in view: periwinkle
+        // and peach drift past slowly while running. Narrow diagonal bands read
+        // as noise; the saturated color belongs to the ribbons and Pip.
+        vec2 field = vec2(vPilotWorld.x + uTravel, vPilotWorld.z);
+        float cool = smoothstep(0.35, 1.0, 0.5 + 0.5 * sin(field.x * 0.085 + field.y * 0.12 + 0.7));
+        float warm = smoothstep(0.45, 1.0, 0.5 + 0.5 * sin(field.x * 0.11 - field.y * 0.09 + 3.4)) * (1.0 - cool);
         float outsideLane = smoothstep(0.7, 2.5, abs(vPilotWorld.z));
-        // Concentrate value in the basin instead of darkening the whole floor.
-        // Saturated periwinkle/cobalt pools and peach warmth on a near-white floor.
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.08,0.14,0.62), pow(basin, 4.0) * outsideLane * 0.78);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42,0.30,0.85), basin * (1.0-basin) * outsideLane * 0.12);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0,0.56,0.32), pow(1.0-basin, 4.0) * outsideLane * 0.26);
+        float distant = smoothstep(2.0, 14.0, -vPilotWorld.z);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62,0.66,0.98), cool * outsideLane * 0.28);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0,0.78,0.64), warm * outsideLane * 0.22);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78,0.78,0.98), distant * 0.18);
       ` : role === "sheet" ? `
         float density = smoothstep(-2.0,3.0,vPilotLocal.x) * (0.5+0.5*sin(vPilotLocal.z*1.8));
       ` : `
@@ -105,7 +111,7 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
       `;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + variation);
       shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n' +
-        (role === "ground" ? 'roughnessFactor = mix(0.14,0.3,basin);' : 'roughnessFactor += density * 0.035;'));
+        (role === "ground" ? '' : 'roughnessFactor += density * 0.035;'));
       if (role === "ground") {
         // scene.environment ignores material.envMapIntensity. Without this the
         // studio's blue/violet cards wash every grazing slope lavender, and the
@@ -201,11 +207,12 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
         // A localized surface catch, never an exposure or opacity change.
         float energy = uEnergy.x * energyContinuity(vPilotWorld);
         float sweep = energySweep(vPilotWorld);
-        ${role === "ground" ? `
+        ${role === "ground" ? (WORLD_LAYERS.formations ? `
+          // Refracted light on the shelf beside the formations.
           float shelf = vPilotWorld.z + 1.85 + sin((vPilotWorld.x+uTravel)*0.55) * 0.36;
           float ribbon = exp(-shelf*shelf/0.065) * smoothstep(0.8,1.5,abs(vPilotWorld.z));
           gl_FragColor.rgb += vec3(0.28,0.18,0.09) * ribbon * energy * (0.45+sweep*0.55);
-        ` : `
+        ` : "") : `
           float grazing = pow(1.0-max(dot(normal,normalize(vViewPosition)),0.0),2.0);
           gl_FragColor.rgb += vec3(0.16,0.12,0.075) * sweep * energy * (0.2+grazing*0.8);
         `}
