@@ -18,6 +18,10 @@ essentials are polished; turning one back on is a single boolean.
   `WorldLightTrails`. Reviews that study disabled objects (the pilot sheet/mineral
   optics, `WorldPassingLight`, foreground visibility in `check-atmosphere-review`)
   do not apply while those layers are off.
+- Light trails are now wind ribbons (`trailShaders.ts`): seven wide, soft
+  ribbons that follow the terrain, sway, twist like silk and lengthen with
+  `uEnergy.x`; waves run on `uEnergyPhase`. Each recycles fully off frame. Still
+  one draw, about 900 triangles, skipped at idle and under reduced motion.
 - Known: the terrain shader still paints the warm/cool pools and the shelf
   caustic that were placed around the formations.
 
