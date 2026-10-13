@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { PipShadow } from "./PipShadow";
 import { ReactiveEnvironment } from "./environment/ReactiveEnvironment";
 import { usePipSurface } from "./usePipSurface";
+import { usePipReflection } from "./usePipReflection";
 import { usePipMotion } from "./usePipMotion";
 
 type PipProps = {
@@ -21,6 +22,7 @@ export function Pip({ intensity, sustainedInput = false, lastCorrectAt, errorCou
   const placement = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF("/models/pip.glb");
   usePipSurface(scene);
+  usePipReflection(scene);
   const motion = usePipMotion(
     scene, placement, animations, intensity, lastCorrectAt, errorCount, status, onFinishExit, sustainedInput,
   );
