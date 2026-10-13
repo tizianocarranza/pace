@@ -22,7 +22,7 @@ export function createLandscapeMaterials(interactions = new WorldInteractions())
     uWarm: { value: new THREE.Color("#f79a5c") },
   };
   function surface(name: string, kind: number, warm = false) {
-    const translucent = kind === 1 || kind === 2;
+    const translucent = kind === 1 || kind === 2 || kind === 5;
     const material = new THREE.ShaderMaterial({
       name, uniforms, vertexShader: landscapeVertex, fragmentShader: landscapeFragment,
       defines: {
@@ -55,6 +55,7 @@ export function createLandscapeMaterials(interactions = new WorldInteractions())
     stone: surface("Pace / polished mineral", 3),
     warmStone: surface("Pace / amber pearl", 3, true),
     foreground: surface("Pace / near pearl", 4),
+    bubble: surface("Pace / iridescent bubble", 5),
   };
 }
 

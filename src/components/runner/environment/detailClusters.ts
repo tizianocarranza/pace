@@ -2,8 +2,8 @@ import * as THREE from "three";
 import { surface, type MeshData } from "./landscape";
 import { terrainHeight } from "./terrainProfile";
 
-type Shape = "mineral" | "sheet" | "lens" | "filament";
-type Finish = "stone" | "warmStone" | "fold" | "warmFold" | "foreground" | "arch";
+type Shape = "mineral" | "sheet" | "lens" | "filament" | "sphere" | "petal";
+type Finish = "stone" | "warmStone" | "fold" | "warmFold" | "foreground" | "arch" | "bubble";
 // Position relative to a named region, height above its terrain, three radii, yaw/lean.
 type Placement = readonly [number, number, number, number, number, number, number?, number?];
 type Detail = { shape: Shape; finish: Finish; at: Placement };
@@ -21,6 +21,14 @@ export const DETAIL_REGIONS: readonly Region[] = [
     { shape: "mineral", finish: "foreground", at: [-3.6, -2.2, 3.1, 0.26, 0.3, 0.22, -0.4] },
     // Thin glass rings sweep high over the formations.
     { shape: "filament", finish: "arch", at: [-0.5, -1.7, 0, 6.4, 3.4, 0.8, 0.15] },
+    // Translucent petals fan up out of the fold; cobalt crystals hang above them.
+    { shape: "petal", finish: "warmFold", at: [1.2, 1.6, 0, 1.6, 3.4, 1.2, 0.5, -0.35] },
+    { shape: "petal", finish: "warmFold", at: [1.9, 1.9, 0, 1.2, 2.6, 1.0, 0.2, -0.15] },
+    { shape: "petal", finish: "fold", at: [0.6, 2.4, 0, 1.3, 2.4, 1.1, -0.4, 0.3] },
+    { shape: "petal", finish: "fold", at: [2.6, 1.2, 0, 0.6, 1.3, 0.5, 0.9, -0.5] },
+    { shape: "mineral", finish: "stone", at: [3.0, 1.9, 2.6, 0.3, 0.4, 0.28, 0.6, 0.3] },
+    { shape: "mineral", finish: "stone", at: [3.9, 2.3, 1.2, 0.24, 0.34, 0.22, -0.5, -0.4] },
+    { shape: "sphere", finish: "bubble", at: [2.3, 1.5, 2.2, 0.26, 0.26, 0.26] },
   ] },
   { name: "Bridge mineral shelf", x: 5.5, z: -4.5, details: [
     { shape: "sheet", finish: "fold", at: [2.5, 1.4, 0, 3.4, 0.48, 0.85, 0.42] },
@@ -31,6 +39,9 @@ export const DETAIL_REGIONS: readonly Region[] = [
     { shape: "mineral", finish: "warmStone", at: [2.95, 0.2, 2.3, 0.14, 0.18, 0.12, -0.4, 0.2] },
     { shape: "mineral", finish: "foreground", at: [4.6, -3.6, 3.1, 0.18, 0.23, 0.17, 0.8] },
     { shape: "filament", finish: "arch", at: [1.6, 0.6, 0, 7.2, 4.2, 0.7, -0.35] },
+    { shape: "sphere", finish: "bubble", at: [-0.2, 0.9, 3.4, 0.42, 0.42, 0.42] },
+    { shape: "sphere", finish: "bubble", at: [-3.1, 1.4, 2.5, 0.2, 0.2, 0.2] },
+    { shape: "mineral", finish: "stone", at: [-2.0, 3.0, 0.5, 0.26, 0.32, 0.24, 0.9, 0.2] },
   ] },
   { name: "Path edge deposits", x: 0, z: -1.7, details: [
     { shape: "lens", finish: "arch", at: [-3.4, 0.15, 0, 1.1, 0.085, 0.42, 0.15] },
@@ -57,7 +68,27 @@ export const DETAIL_REGIONS: readonly Region[] = [
     { shape: "mineral", finish: "stone", at: [4.2, 8.8, 0.15, 0.3, 0.3, 0.24, -0.6] },
     { shape: "mineral", finish: "foreground", at: [0.8, -2.1, 3.3, 0.19, 0.29, 0.22, 0.3] },
   ] },
+  { name: "Suspended motes", x: 0, z: 0, details: createMotes() },
 ];
+
+/** A deterministic drift of small droplets around the formations. The golden
+ * angle spaces them evenly without a grid; every one stays clear of the lane. */
+function createMotes(): Detail[] {
+  const finishes: Finish[] = ["stone", "warmStone", "bubble", "stone", "bubble"];
+  return Array.from({ length: 46 }, (_, i) => {
+    const t = (i * 0.618034) % 1, s = (i * 0.381966 + 0.13) % 1;
+    // Spread over the whole loop so travel never runs out of droplets.
+    const x = (t - 0.5) * 70;
+    // Behind the lane only: in front, a droplet over Pip reads as a third eye.
+    const z = -1.4 - s * 8.5;
+    const size = 0.035 + ((i * 0.7548) % 1) * 0.06;
+    return { shape: "sphere", finish: finishes[i % finishes.length],
+      at: [x, z, 0.5 + ((i * 0.5698) % 1) * 3.6, size, size, size] };
+  });
+}
+
+/** Minerals and spheres hold an authored height; every other shape is rooted. */
+export const floats = (shape: Shape) => shape === "mineral" || shape === "sphere";
 
 export function createDetailGeometry(shape: Shape): MeshData {
   if (shape === "mineral") return surface(10, 6, (u, v) => {
@@ -72,6 +103,18 @@ export function createDetailGeometry(shape: Shape): MeshData {
     return [u - 0.5 + lift * v * 0.14,
       lift * (0.3 + 0.7 * Math.sin(v * Math.PI * 0.85)) - 0.025,
       (v - 0.5) * (0.15 + 0.85 * lift) + lift * Math.sin(v * Math.PI * 1.5) * 0.3];
+  });
+  if (shape === "sphere") return surface(16, 10, (u, v) => {
+    const a = u * Math.PI * 2, p = v * Math.PI;
+    return [Math.cos(a) * Math.sin(p), Math.cos(p), Math.sin(a) * Math.sin(p)];
+  });
+  if (shape === "petal") return surface(12, 8, (u, v) => {
+    // A lanceolate blade rising from a buried point, cupped and leaning as it twists.
+    const width = Math.sin(Math.PI * Math.min(1, u * 1.08)) ** 0.75 * (1 - u * 0.35) * 0.5;
+    const across = (v - 0.5) * 2 * width, twist = u * 0.9;
+    return [0.4 * u * u + across * Math.cos(twist),
+      u - 0.03,
+      across * Math.sin(twist) + (v - 0.5) ** 2 * width * 0.6];
   });
   if (shape === "lens") return surface(32, 6, (u, v) => {
     const a = u * Math.PI * 2, r = v;
@@ -97,13 +140,13 @@ export function createDetailBatches() {
     let batch = batches.get(key);
     if (!batch) { batch = { shape, finish, matrices: [], motion: [] }; batches.set(key, batch); }
     const x = region.x + at[0], z = region.z + at[1];
-    transform.position.set(x, shape === "mineral" ? terrainHeight(x, z) + at[2] : 0, z);
+    transform.position.set(x, floats(shape) ? terrainHeight(x, z) + at[2] : 0, z);
     transform.scale.set(at[3], at[4], at[5]);
     transform.rotation.set(0, at[6] ?? 0, at[7] ?? 0);
     transform.updateMatrix();
     batch.matrices.push(...transform.matrix.elements);
     // Only suspended minerals drift; embedded pieces remain part of the ground.
-    batch.motion.push(shape === "mineral" && at[2] > 1.2 ? 1 : shape === "filament" ? 2 : 0,
+    batch.motion.push(floats(shape) && at[2] > 1.2 ? 1 : shape === "filament" ? 2 : 0,
       x * 0.73 + z * 0.41);
   }
   return Array.from(batches, ([name, batch]) => ({ ...batch, name,

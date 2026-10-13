@@ -142,7 +142,8 @@ export const landscapeFragment = /* glsl */ `
     #if MATERIAL_KIND == 3
       vec3 facet = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
       if (dot(facet, view) < 0.0) facet = -facet;
-      n = normalize(mix(n, facet, 0.28));
+      // Crisp gem facets: each flat face catches the light on its own.
+      n = normalize(mix(n, facet, 0.85));
     #endif
     float nv = max(dot(n, view), 0.0);
     float fresnel = pow(1.0 - nv, 3.0);
@@ -201,7 +202,8 @@ export const landscapeFragment = /* glsl */ `
       #ifdef WARM_ACCENT
         tint = mix(tint, uWarm, 0.42 + smoothstep(-0.15, 0.75, n.x + n.y * 0.5) * 0.53);
       #endif
-      color = mix(tint * 0.67, uPearl, 0.1 + 0.33 * light);
+      // Little pearl: a linear mix with white reads grey/pastel on screen.
+      color = mix(tint * 0.85, uPearl, 0.06 + 0.16 * light);
       color = mix(color, tint * (0.9 + thin * 0.25), thin * 0.42);
       float reflectionBand = studioCard(reflection, uKeyDirection, 0.075);
       color = mix(color, vec3(1.08, 1.04, 1.01), reflectionBand * 0.7 + fresnel * thin * 0.25);
@@ -234,16 +236,25 @@ export const landscapeFragment = /* glsl */ `
       alpha = 0.74 + 0.22 * fresnel;
       // Thin rings read as clear, bright glass lines with cool edges.
       color = mix(color, mix(mix(uViolet, vec3(1.05), 0.6), uBlue, fresnel * 0.5), vFilament * 0.85);
+    #elif MATERIAL_KIND == 5
+      // Thin-film bubble: a nearly clear center, an iridescent peach/lavender
+      // rim that shifts with view angle, and one small hard highlight.
+      float film = 0.5 + 0.5 * sin((1.0 - nv) * 7.5 + vWorld.y * 0.6);
+      vec3 rim = mix(mix(uWarm, uViolet, film), uBlue, smoothstep(0.75, 1.0, film) * 0.4);
+      color = mix(mix(uViolet, uWarm, film * 0.5), rim, smoothstep(0.1, 0.8, 1.0 - nv));
+      float glint = studioCard(reflection, uKeyDirection, 0.012);
+      color = mix(color, vec3(1.15), min(1.0, glint * 1.2 + pow(fresnel, 5.0) * 0.4));
+      alpha = 0.5 + 0.45 * smoothstep(0.1, 0.9, 1.0 - nv) + glint * 0.5;
     #else
-      // Polished artifacts share the mineral palette, with one amber-pearl accent.
-      vec3 body = mix(uDeep, uBlue, light * 0.7);
+      // Faceted cobalt crystals: dark body, narrow flashes on single facets.
+      vec3 body = mix(uDeep * 0.8, uBlue, light * 0.8);
       #ifdef WARM_ACCENT
         body = mix(uWarm * 0.65, uWarm, light);
       #endif
-      color = mix(body, pearl, fresnel * 0.5);
-      float broad = studioCard(reflection, uKeyDirection, 0.10);
-      float small = studioCard(reflection, uCoolDirection, 0.035);
-      color = mix(color, uPearl, min(0.95, broad * 0.65 + small * 0.36 + fresnel * 0.22));
+      color = mix(body, pearl, fresnel * 0.4);
+      float broad = studioCard(reflection, uKeyDirection, 0.05);
+      float small = studioCard(reflection, uCoolDirection, 0.02);
+      color = mix(color, uPearl, min(0.95, broad * 0.8 + small * 0.5 + fresnel * 0.18));
       transmission = (0.12 + fresnel * 0.28) * warmBacklight;
     #endif
 
@@ -299,7 +310,7 @@ export const landscapeFragment = /* glsl */ `
     #endif
     float farFade = smoothstep(29.0, 37.0, -vWorld.z);
     float edge = smoothstep(28.0, 35.0, abs(vWorld.x));
-    #if MATERIAL_KIND > 0 && MATERIAL_KIND < 4
+    #if MATERIAL_KIND > 0 && MATERIAL_KIND != 4
       edge = max(edge, smoothstep(24.0, 34.0, abs(vObjectX)));
     #endif
     vec2 screen = gl_FragCoord.xy / uResolution;
@@ -316,13 +327,13 @@ export const landscapeFragment = /* glsl */ `
     float presence = (1.0 - nearFade) * (1.0 - farFade) * (1.0 - edge) * frame * uVisibility;
     // Neutral study mode uses this same shader/geometry, without new materials.
     color = mix(color, vec3(0.22 + 0.66 * light), uCompositionGray);
-    #if MATERIAL_KIND == 1 || MATERIAL_KIND == 2
+    #if MATERIAL_KIND == 1 || MATERIAL_KIND == 2 || MATERIAL_KIND == 5
       gl_FragColor = vec4(color, alpha * presence);
     #else
       gl_FragColor = vec4(color, 1.0);
     #endif
     #include <tonemapping_fragment>
-    #if MATERIAL_KIND != 1 && MATERIAL_KIND != 2
+    #if MATERIAL_KIND != 1 && MATERIAL_KIND != 2 && MATERIAL_KIND != 5
       #ifdef FOREGROUND
         if (uNearCapture > 0.5) {
           // Linear premultiplied coverage: blur never samples a white backdrop.
