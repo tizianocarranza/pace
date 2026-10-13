@@ -77,17 +77,26 @@ for (const fps of [30, 60, 120]) {
 {
   const f = fixture();
   for (let i = 0; i < 120; i++) f.tick();
-  f.error(); f.tick();
-  const firstDip = f.motion.signals.speed;
+  f.error();
+  // Momentum dips within 0.3 s, but never jumps: the stumble reads as one fluid fall.
+  let firstDip = Infinity, largestStep = 0, largestTempoStep = 0;
+  let previous = f.motion.signals.speed, previousTempo = f.motion.run.getEffectiveTimeScale();
   let reachedMiddle = false;
   let recovered = false;
   for (let i = 0; i < 90; i++) {
     if (i < 35 && i % 4 === 0) f.error();
     f.tick();
+    const { speed } = f.motion.signals, tempo = f.motion.run.getEffectiveTimeScale();
+    if (i < 18) firstDip = Math.min(firstDip, speed);
+    largestStep = Math.max(largestStep, Math.abs(speed - previous));
+    largestTempoStep = Math.max(largestTempoStep, Math.abs(tempo - previousTempo));
+    previous = speed; previousTempo = tempo;
     if (f.motion.signals.stumble > 0.8) reachedMiddle = true;
     if (i > 60 && f.motion.signals.stumble === 0) recovered = true;
   }
-  assert(firstDip < 0.65, 'error interrupts momentum');
+  assert(firstDip < 0.65, `error interrupts momentum: ${firstDip}`);
+  assert(largestStep < 0.05 && largestTempoStep < 0.05,
+    `no single-frame jumps through a stumble: speed ${largestStep}, tempo ${largestTempoStep}`);
   assert(reachedMiddle && recovered, 'rapid mistakes do not restart or lock the stumble');
   assert(f.motion.signals.speed > 0.75, 'typing restores momentum after recovery');
   f.motion.dispose();

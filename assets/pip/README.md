@@ -24,6 +24,13 @@ floor, contacts and framing are unchanged. The game's white vinyl finish is a
 runtime material adjustment (`usePipSurface.ts`); the GLB keeps its ivory.
 Revision 02 is preserved in [revisions/02-static](revisions/02-static/).
 
+Animation (`build_animated.py`): clips are now sampled at 60 fps (same
+durations: Idle 3.2 s, Run 0.8 s, Stumble 1.2 s). The Stumble knots are joined by
+a cubic Hermite curve with continuous velocity; the previous per-segment ease
+stopped the motion at every knot and read as a low frame rate. Its per-frame floor
+correction is dilated and blurred before keying, so it never crosses the floor
+and no longer zigzags the body.
+
 ## Revision 02 — silhouette review (superseded)
 
 This iteration lowers the body by about 8%, increases its frontal width by 7%

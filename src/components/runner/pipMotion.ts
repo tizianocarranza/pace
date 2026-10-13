@@ -38,7 +38,9 @@ const blinkHash = (n: number) => {
   return x - Math.floor(x);
 };
 const blinkInterval = (n: number) => 2 + 3 * blinkHash(n);
-const BLINK_DURATION = 0.15;
+const BLINK_DURATION = 0.28;
+// A lid closes quicker than it opens.
+const BLINK_CLOSING = 0.4;
 // The Body bone's local axes equal Blender's (see assets/pip/build_animated.py):
 // +Z up, -Y forward. Lean already rotates about X.
 const BODY_UP_AXIS = 2;
@@ -63,6 +65,7 @@ export class PipMotion {
   private readonly bounce: Spring = { value: 0, velocity: 0 };
   private readonly roll: Spring = { value: 0, velocity: 0 };
   private breathPhase = 0;
+  private cadence = 0.62;
   private eyeOpen = 1;
   private eyeWidth = 1;
   private blinkClock = 0;
@@ -119,6 +122,7 @@ export class PipMotion {
     this.bounce.value = this.bounce.velocity = 0;
     this.roll.value = this.roll.velocity = 0;
     this.breathPhase = 0;
+    this.cadence = 0.62;
     this.eyeOpen = this.eyeWidth = 1;
     this.face.uEyeOpen.value = this.face.uEyeWidth.value = 1;
     this.blinkClock = this.blinkCount = 0;
@@ -172,9 +176,10 @@ export class PipMotion {
     if (errors > this.previousErrors && status !== "finished") {
       if (!this.stumbling) {
         motion.stumbleSequence++;
-        this.stumble.reset().setEffectiveTimeScale(1.4).play();
+        this.stumble.reset().setEffectiveTimeScale(1.15).play();
         this.stumbling = true;
-        motion.speed *= 0.72;
+        // Momentum drops through the damped target below, never in one frame:
+        // a cut here jumped the run cadence, stretch and lean together.
         this.compression.velocity += 1.5 * reduced;
       }
       // Further errors register in gameplay but never pin the clip at frame zero.
@@ -186,7 +191,7 @@ export class PipMotion {
     }
     const stumblePhase = this.stumbling ? this.stumble.time / this.stumble.getClip().duration : 1;
     const stumbleEnvelope = this.stumbling
-      ? THREE.MathUtils.smoothstep(stumblePhase, 0, 0.09)
+      ? THREE.MathUtils.smoothstep(stumblePhase, 0, 0.2)
         * (1 - THREE.MathUtils.smoothstep(stumblePhase, 0.55, 1))
       : 0;
     motion.stumble = stumbleEnvelope;
@@ -201,7 +206,8 @@ export class PipMotion {
     const target = status === "finished" ? 1 : status === "idle" ? 0
       : intent * (1 - stumbleEnvelope * 0.55);
     const previousSpeed = motion.speed;
-    motion.speed = THREE.MathUtils.damp(motion.speed, target, target > motion.speed ? 5.5 : 3.2, dt);
+    motion.speed = THREE.MathUtils.damp(motion.speed, target,
+      target > motion.speed ? 5.5 : this.stumbling ? 7 : 3.2, dt);
     motion.acceleration = THREE.MathUtils.damp(
       motion.acceleration, (motion.speed - previousSpeed) / dt, 7, dt,
     );
@@ -209,9 +215,11 @@ export class PipMotion {
     motion.active = status !== "idle" || this.stumbling;
 
     const sprint = THREE.MathUtils.smoothstep(motion.speed, 0.55, 1);
-    const cadence = 0.62 + 1.18 * Math.sqrt(motion.speed) + sprint * 0.24;
-    this.run.setEffectiveTimeScale(motion.reducedMotion ? Math.min(cadence, 1.15)
-      : status === "finished" ? 2.35 : cadence);
+    const stride = 0.62 + 1.18 * Math.sqrt(motion.speed) + sprint * 0.24;
+    const cadence = motion.reducedMotion ? Math.min(stride, 1.15) : status === "finished" ? 2.35 : stride;
+    // The clip never changes tempo in a single frame.
+    this.cadence = THREE.MathUtils.damp(this.cadence, cadence, 6, dt);
+    this.run.setEffectiveTimeScale(this.cadence);
     this.run.paused = motion.locomotion < 0.001;
     const stumbleWeight = stumbleEnvelope * (motion.reducedMotion ? 0.15 : 0.62);
     this.idle.setEffectiveWeight((1 - motion.locomotion) * (1 - stumbleWeight));
@@ -315,7 +323,10 @@ export class PipMotion {
       if (this.blinkTime >= 0) {
         this.blinkTime += dt;
         const t = Math.min(1, this.blinkTime / BLINK_DURATION);
-        blink = 1 - 0.95 * Math.sin(Math.PI * t) ** 2;
+        const closure = t < BLINK_CLOSING
+          ? THREE.MathUtils.smoothstep(t, 0, BLINK_CLOSING)
+          : 1 - THREE.MathUtils.smoothstep(t, BLINK_CLOSING, 1);
+        blink = 1 - 0.95 * closure;
         if (t >= 1) {
           // Now and then a second blink follows straight away.
           this.blinkTime = this.doubleBlink ? 0 : -1;
