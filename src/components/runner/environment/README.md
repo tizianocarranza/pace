@@ -26,8 +26,15 @@ essentials are polished; turning one back on is a single boolean.
   ribbons that follow the terrain, sway, twist like silk and lengthen with
   `uEnergy.x`; waves run on `uEnergyPhase`. Each recycles fully off frame. Still
   one draw, about 900 triangles, skipped at idle and under reduced motion.
-- Known: the terrain shader still paints the warm/cool pools and the shelf
-  caustic that were placed around the formations.
+- The production floor (`pilot.ground` in `pilotMaterials.ts`) is a calm satin
+  pearl: two slow, broad periwinkle/peach zones (two or three in view, never
+  bands) replace the narrow diagonal cobalt basins, plus a faint lavender with
+  distance. A softer clear coat (0.45, roughness 0.22) and roughness 0.38 stop
+  the studio cards mirroring as hard streaks. The shelf caustic at z ≈ −1.85
+  returns only with `WORLD_LAYERS.formations`.
+- Review modes: `review-composition.mjs --quick` loads the legacy
+  `materials=current` study (shader terrain, no atmosphere). Only `--energy`
+  captures show the production pilot floor.
 
 Verify: `PACE_STUDIES=b node scripts/review-composition.mjs --quick`, then
 `--energy --wpm=90`, and `--mobile --energy --wpm=90`.
