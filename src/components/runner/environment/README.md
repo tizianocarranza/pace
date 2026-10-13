@@ -22,6 +22,10 @@ essentials are polished; turning one back on is a single boolean.
   `assets/pip/README.md`) and a soft white vinyl finish with a faint lavender
   lift in `usePipSurface.ts`. He is placed by his soles (`PIP_SOLE_Y`), so the
   floor, contacts and Study B framing are unchanged.
+- Light trails are now wind ribbons (`trailShaders.ts`): seven wide, soft
+  ribbons that follow the terrain, sway, twist like silk and lengthen with
+  `uEnergy.x`; waves run on `uEnergyPhase`. Each recycles fully off frame. Still
+  one draw, about 900 triangles, skipped at idle and under reduced motion.
 - Known: the terrain shader still paints the warm/cool pools and the shelf
   caustic that were placed around the formations.
 
