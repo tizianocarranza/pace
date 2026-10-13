@@ -208,20 +208,32 @@ export const landscapeFragment = /* glsl */ `
       transmission = thin * (0.25 + 0.75 * warmBacklight);
       alpha = 0.78 + 0.18 * fresnel - thin * 0.22;
     #elif MATERIAL_KIND == 2
-      // Approximate thickness-dependent absorption; background remains visible through the arch.
-      float thickness = (0.35 + nv * 1.25) * (1.0 - 0.4 * smoothstep(0.0, 4.5, vLocal.y));
-      vec3 absorption = exp(-vec3(1.8, 0.85, 0.34) * thickness);
-      color = mix(uDeep * 0.72, uBlue, 0.14 + light * 0.48);
-      color = mix(color, absorption, 0.02 + light * 0.06);
-      float milk = exp(-thickness * 2.0);
-      color = mix(color, mix(uViolet, uPearl, milk), 0.12 + fresnel * 0.3);
-      transmission = exp(-thickness * 1.5) * (0.2 + warmBacklight * 0.8);
-      float wide = studioCard(reflection, uKeyDirection, 0.085);
-      float edgeLight = studioCard(reflection, uCoolDirection, 0.026);
-      float front = studioCard(reflection, vec3(0.12, 0.2, 1.0), 0.025);
-      color = mix(color, mix(uCoolLight, vec3(1.15), 0.8), min(0.96, wide * 0.75 + edgeLight * 0.55 + front * 0.36 + fresnel * 0.16));
-      color += mix(uWarmLight, vec3(1.0), 0.32) * pow(transmission, 1.2) * 0.7;
-      alpha = 0.45 + 0.34 * fresnel + 0.1 * thickness;
+      // Thick glass band: a clear face, saturated color where the optical path
+      // lengthens toward the edges, cobalt grading into peach along the span.
+      float thickness = (0.35 + (1.0 - nv) * 1.6) * (1.0 - 0.3 * smoothstep(0.0, 4.5, vLocal.y));
+      float span = smoothstep(-0.6, 0.9, sin(vLocal.x * 0.55 + vLocal.y * 0.32 + 0.4));
+      // Eased (not linear) so the middle of the span does not turn mauve.
+      vec3 glassTint = mix(mix(uDeep, uBlue, 0.55), uWarm, smoothstep(0.1, 1.0, span) * 0.8);
+      // Mixing is linear: even a little white reads as pastel in sRGB.
+      vec3 absorption = mix(vec3(1.0), glassTint, 0.88 + 0.12 * (1.0 - exp(-thickness * 1.4)));
+      // Light passing straight through the face glows; edges hold the color.
+      color = mix(absorption, mix(absorption, vec3(1.0), 0.28), nv * nv);
+      color = mix(color, uDeep, pow(fresnel, 2.0) * 0.45 * (1.0 - span));
+      // Kept low: shared warm mixing below reads transmission as a pink veil.
+      transmission = exp(-thickness * 1.2) * (0.08 + warmBacklight * 0.3);
+      // Sparse internal streaks: a few fine refracted lines along the band.
+      float streakPhase = vLocal.y * 5.5 + vLocal.x * 1.7 + sin(vLocal.x * 3.1 + vLocal.y) * 1.4;
+      float streaks = pow(abs(sin(streakPhase)), 90.0) * step(0.7, fract(streakPhase * 0.159 + 0.2));
+      color = mix(color, vec3(1.1), streaks * (0.2 + 0.3 * fresnel));
+      // Narrow highlights and bright rims; a broad lobe would bleach the face.
+      float wide = studioCard(reflection, uKeyDirection, 0.04);
+      float edgeLight = studioCard(reflection, uCoolDirection, 0.02);
+      float front = studioCard(reflection, vec3(0.12, 0.2, 1.0), 0.02);
+      color = mix(color, mix(uCoolLight, vec3(1.15), 0.8), min(0.92, wide * 0.7 + edgeLight * 0.6 + front * 0.35 + pow(fresnel, 4.0) * 0.6));
+      color += mix(uWarmLight, vec3(1.0), 0.32) * pow(transmission, 1.2) * 0.5;
+      alpha = 0.74 + 0.22 * fresnel;
+      // Thin rings read as clear, bright glass lines with cool edges.
+      color = mix(color, mix(mix(uViolet, vec3(1.05), 0.6), uBlue, fresnel * 0.5), vFilament * 0.85);
     #else
       // Polished artifacts share the mineral palette, with one amber-pearl accent.
       vec3 body = mix(uDeep, uBlue, light * 0.7);

@@ -19,7 +19,8 @@ export const DETAIL_REGIONS: readonly Region[] = [
     { shape: "mineral", finish: "warmStone", at: [-1.6, 1.65, 0.15, 0.13, 0.11, 0.16, 0.5] },
     { shape: "mineral", finish: "stone", at: [-2.45, -0.4, 2.1, 0.11, 0.17, 0.10, 0.2, 0.3] },
     { shape: "mineral", finish: "foreground", at: [-3.6, -2.2, 3.1, 0.26, 0.3, 0.22, -0.4] },
-    { shape: "filament", finish: "arch", at: [-0.5, -1.7, 0, 6.4, 1.65, 0.8, 0.15] },
+    // Thin glass rings sweep high over the formations.
+    { shape: "filament", finish: "arch", at: [-0.5, -1.7, 0, 6.4, 3.4, 0.8, 0.15] },
   ] },
   { name: "Bridge mineral shelf", x: 5.5, z: -4.5, details: [
     { shape: "sheet", finish: "fold", at: [2.5, 1.4, 0, 3.4, 0.48, 0.85, 0.42] },
@@ -29,6 +30,7 @@ export const DETAIL_REGIONS: readonly Region[] = [
     { shape: "mineral", finish: "stone", at: [3.0, 1.55, 0.10, 0.12, 0.15, 0.13, 0.5] },
     { shape: "mineral", finish: "warmStone", at: [2.95, 0.2, 2.3, 0.14, 0.18, 0.12, -0.4, 0.2] },
     { shape: "mineral", finish: "foreground", at: [4.6, -3.6, 3.1, 0.18, 0.23, 0.17, 0.8] },
+    { shape: "filament", finish: "arch", at: [1.6, 0.6, 0, 7.2, 4.2, 0.7, -0.35] },
   ] },
   { name: "Path edge deposits", x: 0, z: -1.7, details: [
     { shape: "lens", finish: "arch", at: [-3.4, 0.15, 0, 1.1, 0.085, 0.42, 0.15] },
@@ -80,8 +82,8 @@ export function createDetailGeometry(shape: Shape): MeshData {
   // A narrow, solid elliptical section; both tips disappear into the terrain.
   return surface(64, 6, (u, v) => {
     const rise = Math.sin(u * Math.PI), a = v * Math.PI * 2;
-    return [u - 0.5, rise ** 0.9 * (1 + 0.22 * Math.cos(u * Math.PI)) + Math.cos(a) * 0.008 - 0.04,
-      Math.sin(u * Math.PI * 2) * 0.55 + Math.sin(a) * 0.035];
+    return [u - 0.5, rise ** 0.9 * (1 + 0.22 * Math.cos(u * Math.PI)) + Math.cos(a) * 0.014 - 0.04,
+      Math.sin(u * Math.PI * 2) * 0.55 + Math.sin(a) * 0.05];
   });
 }
 
