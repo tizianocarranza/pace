@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { DoubleSide, Mesh, ShaderMaterial, Vector4 } from "three";
-import { type createLandscapeMaterials } from "./landscapeMaterials";
+import { RENDER_ORDER, type createLandscapeMaterials } from "./landscapeMaterials";
 import { createTrailGeometry, trailFragment, trailVertex } from "./trailShaders";
 
 /** Ground-level light streaks: one draw, no textures/targets, shared uniforms. */
@@ -32,5 +32,5 @@ export function LightTrails({ surfaces, enabled = true }: { surfaces: ReturnType
     if (mesh.current) mesh.current.visible = enabled && material.uniforms.uEnergy.value.x > 0.0001;
   });
   return <mesh ref={mesh} name="WorldLightTrails" geometry={geometry} material={material}
-    frustumCulled={false} dispose={null} />;
+    renderOrder={RENDER_ORDER.light} frustumCulled={false} dispose={null} />;
 }

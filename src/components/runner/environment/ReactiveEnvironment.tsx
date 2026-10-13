@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { type PipStatus } from "../pipMotion";
 import { type PipMotionRef } from "../usePipMotion";
 import { LandscapeMotion, FORMATIONS, FORMATION_HEIGHT_SCALE, createFormation, createTerrain, createNearBank } from "./landscape";
-import { createLandscapeMaterials, formationMaterial } from "./landscapeMaterials";
+import { createLandscapeMaterials, formationMaterial, hasTranslucentDepth, RENDER_ORDER } from "./landscapeMaterials";
 import { updateLightingUniforms, type createLightingUniforms } from "./worldLighting";
 import { EnvironmentDetails } from "./EnvironmentDetails";
 import { FOREGROUND_RATE } from "./worldMotion";
@@ -38,6 +38,15 @@ export function ReactiveEnvironment({ motion, status }: {
   const nearBanks = useRef<THREE.Group>(null);
   const terrain = useMemo(() => createTerrain(), []);
   const shapes = useMemo(() => FORMATIONS.map(createFormation), []);
+  // Shared by each formation and its translucent depth twin, so owned here.
+  const formationGeometry = useMemo(() => shapes.map(shape => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(shape.positions, 3));
+    geometry.setAttribute("normal", new THREE.BufferAttribute(shape.normals, 3));
+    geometry.setIndex(new THREE.BufferAttribute(shape.indices, 1));
+    return geometry;
+  }), [shapes]);
+  useEffect(() => () => formationGeometry.forEach(geometry => geometry.dispose()), [formationGeometry]);
   const banks = useMemo(() => [createNearBank(false), createNearBank(true)], []);
   const bankCrests = useMemo(() => banks.map(bank => {
     let crest = -Infinity;
@@ -124,18 +133,22 @@ export function ReactiveEnvironment({ motion, status }: {
         <primitive object={materialMode === "pilot" ? pilot.ground : surfaces.terrain} attach="material" />
       </mesh>
       <group ref={formations}>
-        {FORMATIONS.map((form, i) => (
-          <mesh key={form.name} name={form.name} position={[form.x, 0, form.z]}>
-            <bufferGeometry>
-              <bufferAttribute attach="attributes-position" args={[shapes[i].positions, 3]} />
-              <bufferAttribute attach="attributes-normal" args={[shapes[i].normals, 3]} />
-              <bufferAttribute attach="index" args={[shapes[i].indices, 1]} />
-            </bufferGeometry>
-            <primitive object={materialMode === "pilot" && form.name === "WesternFold" ? pilot.sheet
-              : materialMode === "pilot" && form.name === "SuspendedStone" ? pilot.mineral
-              : surfaces[formationMaterial(form.name, form.kind)]} attach="material" />
-          </mesh>
-        ))}
+        {FORMATIONS.map((form, i) => {
+          const finish = formationMaterial(form.name, form.kind);
+          const optical = materialMode !== "pilot" ? null
+            : form.name === "WesternFold" ? pilot.sheet : form.name === "SuspendedStone" ? pilot.mineral : null;
+          const layered = !optical && hasTranslucentDepth(finish);
+          return (
+            <mesh key={form.name} name={form.name} position={[form.x, 0, form.z]}
+              geometry={formationGeometry[i]} renderOrder={layered ? RENDER_ORDER.translucent : 0} dispose={null}>
+              <primitive object={optical ?? surfaces[finish]} attach="material" />
+              {layered && (
+                <mesh name={`${form.name} depth`} geometry={formationGeometry[i]} material={surfaces.translucentDepth}
+                  renderOrder={RENDER_ORDER.translucentDepth} dispose={null} />
+              )}
+            </mesh>
+          );
+        })}
       </group>
       <group ref={nearBanks}>
         {banks.map((bank, i) => (

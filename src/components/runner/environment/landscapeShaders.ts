@@ -131,7 +131,35 @@ export const landscapeFragment = /* glsl */ `
     float alignment = max(dot(reflection, normalize(direction)), 0.0);
     return exp((alignment - 1.0) / spread);
   }
+  // Coverage at the world's boundaries and the composition frame: (boundary air, presence).
+  vec2 surfaceCoverage() {
+    float nearFade = smoothstep(6.0, 10.0, vWorld.z);
+    #ifdef FOREGROUND
+      nearFade = 0.0;
+    #endif
+    float farFade = smoothstep(29.0, 37.0, -vWorld.z);
+    float edge = smoothstep(28.0, 35.0, abs(vWorld.x));
+    #if MATERIAL_KIND > 0 && MATERIAL_KIND != 4
+      edge = max(edge, smoothstep(24.0, 34.0, abs(vObjectX)));
+    #endif
+    vec2 screen = gl_FragCoord.xy / uResolution;
+    float frame = smoothstep(0.15, 0.26, screen.y) * (1.0 - smoothstep(0.67, 0.77, screen.y));
+    // Crop at the viewport sides: a screen-edge fade made the world read as a
+    // rectangular panel and erased the strongest near-plane depth cue.
+    // Preserve the actual central sentence area, while letting cropped side
+    // forms reach higher. This is a composition mask, not a character halo.
+    float sentenceColumn = 1.0 - smoothstep(0.22, 0.38, abs(screen.x - 0.5));
+    frame *= 1.0 - sentenceColumn * smoothstep(0.60, 0.66, screen.y);
+    float boundaryAir = max(max(nearFade, farFade), max(edge, 1.0 - frame));
+    return vec2(boundaryAir, (1.0 - nearFade) * (1.0 - farFade) * (1.0 - edge) * frame * uVisibility);
+  }
   void main() {
+    #ifdef DEPTH_PREPASS
+      // Depth only: the front-most translucent surface hides every layer behind it.
+      if (surfaceCoverage().y < 0.5) discard;
+      gl_FragColor = vec4(0.0);
+      return;
+    #endif
     vec3 view = normalize(cameraPosition - vWorld);
     vec3 n = normalize(vNormal);
     // Terrain normals always point out of the height field. Flipping them near a
@@ -314,27 +342,10 @@ export const landscapeFragment = /* glsl */ `
     } else {
       color = mix(color, mix(air, vec3(1.0), legacyAir), legacyAir * 0.985);
     }
-    float nearFade = smoothstep(6.0, 10.0, vWorld.z);
-    #ifdef FOREGROUND
-      nearFade = 0.0;
-    #endif
-    float farFade = smoothstep(29.0, 37.0, -vWorld.z);
-    float edge = smoothstep(28.0, 35.0, abs(vWorld.x));
-    #if MATERIAL_KIND > 0 && MATERIAL_KIND != 4
-      edge = max(edge, smoothstep(24.0, 34.0, abs(vObjectX)));
-    #endif
-    vec2 screen = gl_FragCoord.xy / uResolution;
-    float frame = smoothstep(0.15, 0.26, screen.y) * (1.0 - smoothstep(0.67, 0.77, screen.y));
-    // Crop at the viewport sides: a screen-edge fade made the world read as a
-    // rectangular panel and erased the strongest near-plane depth cue.
-    // Preserve the actual central sentence area, while letting cropped side
-    // forms reach higher. This is a composition mask, not a character halo.
-    float sentenceColumn = 1.0 - smoothstep(0.22, 0.38, abs(screen.x - 0.5));
-    frame *= 1.0 - sentenceColumn * smoothstep(0.60, 0.66, screen.y);
+    vec2 coverage = surfaceCoverage();
     // Bleach boundary surfaces before their coverage disappears, avoiding a cut-out silhouette.
-    float boundaryAir = max(max(nearFade, farFade), max(edge, 1.0 - frame));
-    color = mix(color, vec3(1.0), smoothstep(0.05, 0.9, boundaryAir) * 0.78 * (1.0 - uAtmosphere));
-    float presence = (1.0 - nearFade) * (1.0 - farFade) * (1.0 - edge) * frame * uVisibility;
+    color = mix(color, vec3(1.0), smoothstep(0.05, 0.9, coverage.x) * 0.78 * (1.0 - uAtmosphere));
+    float presence = coverage.y;
     // Neutral study mode uses this same shader/geometry, without new materials.
     color = mix(color, vec3(0.22 + 0.66 * light), uCompositionGray);
     #if MATERIAL_KIND == 1 || MATERIAL_KIND == 2 || MATERIAL_KIND == 5

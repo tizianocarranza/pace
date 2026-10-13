@@ -43,6 +43,19 @@ decisions: no bloom (Phase 4), no motes (Phase 5) and the small detail budget
    the floor, so the ordinary depth test hides it behind Pip and anything in
    front, with no stencil buffer or extra pass. It fades within a short distance.
 
+8. **Translucent depth.** Resin (kind 1) and glass (kind 2) wrote no depth and
+   drew in arbitrary order (instanced batches all sort at the origin), so sheets,
+   petals and arches showed their own back layers and each other in the wrong
+   order. Each such formation and detail batch now has a depth-only twin
+   (`translucentDepth`, `DEPTH_PREPASS` in the shared shader, slight polygon
+   offset) drawn first in the transparent queue (`RENDER_ORDER` in
+   `landscapeMaterials.ts`): only the front-most resin/glass layer is shaded,
+   over the opaque world. Bubbles (kind 5) stay layered on purpose and draw
+   after it; light trails and passing light draw last. Fragments below 0.5
+   coverage (frame/haze/finish fades) write no depth. Cost: +11 depth-only draws
+   and ~+25k triangles (39→50 draws at idle). Verify with
+   `PACE_STUDIES=b node scripts/review-composition.mjs --quick` and `--energy --wpm=90`.
+
 Still open: a real bloom pass for crystal and bubble glints, a stronger glow at
 Pip's feet, denser authored detail in the part of the loop seen while running,
 larger foreground blobs (this would touch the Study B framing) and the Pip model
