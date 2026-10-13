@@ -1,7 +1,9 @@
 import * as THREE from "three";
 
-// The centered, unchanged GLB is 1.744 units tall in its rest pose.
 export const PIP_FLOOR_Y = -0.88;
+// Pip is placed by his soles (GLB y = 0), not his bounding box, so a taller
+// body grows upward and the floor, world and framing stay where they are.
+export const PIP_SOLE_Y = PIP_FLOOR_Y + 0.008;
 
 export type FootContact = {
   point: THREE.Vector3;

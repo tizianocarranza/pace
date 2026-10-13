@@ -18,6 +18,10 @@ essentials are polished; turning one back on is a single boolean.
   `WorldLightTrails`. Reviews that study disabled objects (the pilot sheet/mineral
   optics, `WorldPassingLight`, foreground visibility in `check-atmosphere-review`)
   do not apply while those layers are off.
+- Pip is a taller egg with larger eyes (model revision 03, see
+  `assets/pip/README.md`) and a soft white vinyl finish with a faint lavender
+  lift in `usePipSurface.ts`. He is placed by his soles (`PIP_SOLE_Y`), so the
+  floor, contacts and Study B framing are unchanged.
 - Light trails are now wind ribbons (`trailShaders.ts`): seven wide, soft
   ribbons that follow the terrain, sway, twist like silk and lengthen with
   `uEnergy.x`; waves run on `uEnergyPhase`. Each recycles fully off frame. Still

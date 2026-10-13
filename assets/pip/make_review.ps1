@@ -94,7 +94,7 @@ try {
     $canvas = New-Canvas 1800 810
     try {
         Write-Label $canvas.Graphics 'PIP / STATIC MODEL' 65 48 $titleFont
-        Write-Label $canvas.Graphics 'Phase 1 / Revision 02 - orthographic silhouette review' 65 99 $smallFont $muted
+        Write-Label $canvas.Graphics 'Phase 1 / Revision 03 - orthographic silhouette review' 65 99 $smallFont $muted
         $views = @('side', 'front', 'three-quarter')
         $labels = @('01 / SIDE', '02 / FRONT', '03 / THREE-QUARTER')
         for ($i = 0; $i -lt $views.Count; $i++) {
@@ -115,7 +115,7 @@ try {
     $canvas = New-Canvas 1800 1220
     try {
         Write-Label $canvas.Graphics 'PIP / REFERENCE COMPARISON' 65 48 $titleFont
-        Write-Label $canvas.Graphics 'Revision 02 / Canonical IDLE and static model at equal silhouette height, including feet' 65 99 $smallFont $muted
+        Write-Label $canvas.Graphics 'Revision 03 / Canonical IDLE and static model at equal silhouette height, including feet' 65 99 $smallFont $muted
         Write-Label $canvas.Graphics 'CANONICAL IDLE' 275 163 $labelFont
         Write-Label $canvas.Graphics 'STATIC THREE-QUARTER' 1115 163 $labelFont
 
