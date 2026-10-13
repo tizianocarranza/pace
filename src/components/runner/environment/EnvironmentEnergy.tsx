@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { DoubleSide, Mesh, ShaderMaterial, Vector4 } from "three";
-import { type createLandscapeMaterials } from "./landscapeMaterials";
+import { RENDER_ORDER, type createLandscapeMaterials } from "./landscapeMaterials";
 import { createEnergyGeometry } from "./energyGeometry";
 import { energyFragment, energyVertex } from "./energyShaders";
 
@@ -33,5 +33,5 @@ export function EnvironmentEnergy({ surfaces, enabled = true }: { surfaces: Retu
     if (mesh.current) mesh.current.visible = enabled && material.uniforms.uEnergy.value.x > 0.0001;
   });
   return <mesh ref={mesh} name="WorldPassingLight" geometry={geometry} material={material}
-    frustumCulled={false} dispose={null} />;
+    renderOrder={RENDER_ORDER.light} frustumCulled={false} dispose={null} />;
 }

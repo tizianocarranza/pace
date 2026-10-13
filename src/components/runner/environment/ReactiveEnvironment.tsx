@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { type PipStatus } from "../pipMotion";
 import { type PipMotionRef } from "../usePipMotion";
 import { LandscapeMotion, FORMATIONS, FORMATION_HEIGHT_SCALE, createFormation, createTerrain, createNearBank } from "./landscape";
-import { createLandscapeMaterials, formationMaterial } from "./landscapeMaterials";
+import { createLandscapeMaterials, formationMaterial, hasTranslucentDepth, RENDER_ORDER } from "./landscapeMaterials";
 import { updateLightingUniforms, type createLightingUniforms } from "./worldLighting";
 import { EnvironmentDetails } from "./EnvironmentDetails";
 import { FOREGROUND_RATE } from "./worldMotion";
@@ -22,6 +22,7 @@ import { useEnergySelection } from "../EnergyStudy";
 import { WorldEnergy } from "./worldEnergy";
 import { EnvironmentEnergy } from "./EnvironmentEnergy";
 import { LightTrails } from "./LightTrails";
+import { WORLD_LAYERS } from "./worldLayers";
 
 /** A fixed window into a continuous landscape, independent of Pip's placement. */
 export function ReactiveEnvironment({ motion, status }: {
@@ -38,6 +39,15 @@ export function ReactiveEnvironment({ motion, status }: {
   const nearBanks = useRef<THREE.Group>(null);
   const terrain = useMemo(() => createTerrain(), []);
   const shapes = useMemo(() => FORMATIONS.map(createFormation), []);
+  // Shared by each formation and its translucent depth twin, so owned here.
+  const formationGeometry = useMemo(() => shapes.map(shape => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(shape.positions, 3));
+    geometry.setAttribute("normal", new THREE.BufferAttribute(shape.normals, 3));
+    geometry.setIndex(new THREE.BufferAttribute(shape.indices, 1));
+    return geometry;
+  }), [shapes]);
+  useEffect(() => () => formationGeometry.forEach(geometry => geometry.dispose()), [formationGeometry]);
   const banks = useMemo(() => [createNearBank(false), createNearBank(true)], []);
   const bankCrests = useMemo(() => banks.map(bank => {
     let crest = -Infinity;
@@ -124,21 +134,25 @@ export function ReactiveEnvironment({ motion, status }: {
         <primitive object={materialMode === "pilot" ? pilot.ground : surfaces.terrain} attach="material" />
       </mesh>
       <group ref={formations}>
-        {FORMATIONS.map((form, i) => (
-          <mesh key={form.name} name={form.name} position={[form.x, 0, form.z]}>
-            <bufferGeometry>
-              <bufferAttribute attach="attributes-position" args={[shapes[i].positions, 3]} />
-              <bufferAttribute attach="attributes-normal" args={[shapes[i].normals, 3]} />
-              <bufferAttribute attach="index" args={[shapes[i].indices, 1]} />
-            </bufferGeometry>
-            <primitive object={materialMode === "pilot" && form.name === "WesternFold" ? pilot.sheet
-              : materialMode === "pilot" && form.name === "SuspendedStone" ? pilot.mineral
-              : surfaces[formationMaterial(form.name, form.kind)]} attach="material" />
-          </mesh>
-        ))}
+        {WORLD_LAYERS.formations && FORMATIONS.map((form, i) => {
+          const finish = formationMaterial(form.name, form.kind);
+          const optical = materialMode !== "pilot" ? null
+            : form.name === "WesternFold" ? pilot.sheet : form.name === "SuspendedStone" ? pilot.mineral : null;
+          const layered = !optical && hasTranslucentDepth(finish);
+          return (
+            <mesh key={form.name} name={form.name} position={[form.x, 0, form.z]}
+              geometry={formationGeometry[i]} renderOrder={layered ? RENDER_ORDER.translucent : 0} dispose={null}>
+              <primitive object={optical ?? surfaces[finish]} attach="material" />
+              {layered && (
+                <mesh name={`${form.name} depth`} geometry={formationGeometry[i]} material={surfaces.translucentDepth}
+                  renderOrder={RENDER_ORDER.translucentDepth} dispose={null} />
+              )}
+            </mesh>
+          );
+        })}
       </group>
       <group ref={nearBanks}>
-        {banks.map((bank, i) => (
+        {WORLD_LAYERS.nearBanks && banks.map((bank, i) => (
           <mesh key={i} name={i ? "NearEasternBank" : "NearWesternBank"}>
             <bufferGeometry>
               <bufferAttribute attach="attributes-position" args={[bank.positions, 3]} />
@@ -149,9 +163,13 @@ export function ReactiveEnvironment({ motion, status }: {
           </mesh>
         ))}
       </group>
-      <EnvironmentDetails surfaces={surfaces} world={controller} />
-      <EnvironmentEnergy surfaces={surfaces} enabled={energyMode === "on" && !composition.gray} />
-      <LightTrails surfaces={surfaces} enabled={energyMode === "on" && !composition.gray} />
+      {WORLD_LAYERS.details && <EnvironmentDetails surfaces={surfaces} world={controller} />}
+      {WORLD_LAYERS.passingLight && (
+        <EnvironmentEnergy surfaces={surfaces} enabled={energyMode === "on" && !composition.gray} />
+      )}
+      {WORLD_LAYERS.lightTrails && (
+        <LightTrails surfaces={surfaces} enabled={energyMode === "on" && !composition.gray} />
+      )}
     </group>
   );
 }

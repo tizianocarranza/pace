@@ -61,7 +61,7 @@ try {
   const shot = async name => {
     const png = await call('Page.captureScreenshot', { format: 'png' });
     await writeFile(path.join(output, `${name}.png`), Buffer.from(png.data, 'base64'));
-    report.frames[name] = await evaluate(`(()=>{const {camera,scene,renderer}=window.__paceReview;const terrain=scene.getObjectByName('NearMineralFragment');return {time:reviewTime,travel:terrain.material.uniforms.uTravel.value,energy:terrain.material.uniforms.uEnergy.value.toArray(),camera:camera.toJSON(),buffers:reviewBuffers,draws:renderer.info.render.calls,triangles:renderer.info.render.triangles,text:document.querySelector('main section p')?.textContent,wpm:document.querySelector('span.text-3xl')?.textContent};})()`);
+    report.frames[name] = await evaluate(`(()=>{const {camera,scene,renderer}=window.__paceReview;const terrain=scene.getObjectByName('WorldLightTrails');return {time:reviewTime,travel:terrain.material.uniforms.uTravel.value,energy:terrain.material.uniforms.uEnergy.value.toArray(),camera:camera.toJSON(),buffers:reviewBuffers,draws:renderer.info.render.calls,triangles:renderer.info.render.triangles,text:document.querySelector('main section p')?.textContent,wpm:document.querySelector('span.text-3xl')?.textContent};})()`);
     console.log(name, 'travel', report.frames[name].travel.toFixed(3));
   };
   for (const study of studies) {
@@ -106,9 +106,9 @@ try {
     await advance(120); await shot(`${prefix}-02`);
     await advance(60); await shot(`${prefix}-03`);
     // Neutral shader switch, held by the harness for the identical camera/pose.
-    await evaluate(`(()=>{const u=__paceReview.scene.getObjectByName('NearMineralFragment').material.uniforms.uCompositionGray;Object.defineProperty(u,'value',{configurable:true,get:()=>1,set:()=>{}});})()`);
+    await evaluate(`(()=>{const u=__paceReview.scene.getObjectByName('WorldLightTrails').material.uniforms.uCompositionGray;Object.defineProperty(u,'value',{configurable:true,get:()=>1,set:()=>{}});})()`);
     await sleep(100); await shot(`${prefix}-03-gray`);
-    await evaluate(`Object.defineProperty(__paceReview.scene.getObjectByName('NearMineralFragment').material.uniforms.uCompositionGray,'value',{configurable:true,writable:true,value:0})`);
+    await evaluate(`Object.defineProperty(__paceReview.scene.getObjectByName('WorldLightTrails').material.uniforms.uCompositionGray,'value',{configurable:true,writable:true,value:0})`);
     if (process.argv.includes('--overlap')) {
       // B's desktop near-bank overlap peaks around 6.5 simulated seconds.
       await advance(211); await shot(`${prefix}-overlap`);

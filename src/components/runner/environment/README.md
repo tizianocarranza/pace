@@ -1,6 +1,30 @@
 # Landscape and material family
 
-## Target art direction pass (current)
+## Essential world pass (current)
+
+The world read as cluttered, so it is reduced to its essentials: the terrain,
+Pip (with his shadow and reflection) and the light trails. Every other layer is
+switched off in `worldLayers.ts` (`WORLD_LAYERS`), not deleted: formations,
+details (including `NearMineralFragment`), the near banks and the passing-light
+paths (`EnvironmentEnergy`). Layers will be reintroduced one at a time once the
+essentials are polished; turning one back on is a single boolean.
+
+- Without `WesternFold`/`SuspendedStone`, `LayeredOptics` builds no fold capture,
+  and `ForegroundSoftness` has no near meshes, so it draws the frame directly.
+- Draws at idle 50 → 16; triangles about 167k → 92k (desktop, Study B).
+- Pure-function checks (`check-environment`, `check-landscape-topology`) still
+  cover the disabled layers' geometry and budgets.
+- `review-composition` and `review-materials` now read the shared uniforms from
+  `WorldLightTrails`. Reviews that study disabled objects (the pilot sheet/mineral
+  optics, `WorldPassingLight`, foreground visibility in `check-atmosphere-review`)
+  do not apply while those layers are off.
+- Known: the terrain shader still paints the warm/cool pools and the shelf
+  caustic that were placed around the formations.
+
+Verify: `PACE_STUDIES=b node scripts/review-composition.mjs --quick`, then
+`--energy --wpm=90`, and `--mobile --energy --wpm=90`.
+
+## Target art direction pass (retained)
 
 A seven-step pass moved the world and Pip toward the reference image kept
 locally in `target/` (Git-ignored). It deliberately supersedes three earlier
@@ -42,6 +66,19 @@ decisions: no bloom (Phase 4), no motes (Phase 5) and the small detail budget
    the same skeleton and morphs. Its vertices are slid along the camera ray onto
    the floor, so the ordinary depth test hides it behind Pip and anything in
    front, with no stencil buffer or extra pass. It fades within a short distance.
+
+8. **Translucent depth.** Resin (kind 1) and glass (kind 2) wrote no depth and
+   drew in arbitrary order (instanced batches all sort at the origin), so sheets,
+   petals and arches showed their own back layers and each other in the wrong
+   order. Each such formation and detail batch now has a depth-only twin
+   (`translucentDepth`, `DEPTH_PREPASS` in the shared shader, slight polygon
+   offset) drawn first in the transparent queue (`RENDER_ORDER` in
+   `landscapeMaterials.ts`): only the front-most resin/glass layer is shaded,
+   over the opaque world. Bubbles (kind 5) stay layered on purpose and draw
+   after it; light trails and passing light draw last. Fragments below 0.5
+   coverage (frame/haze/finish fades) write no depth. Cost: +11 depth-only draws
+   and ~+25k triangles (39→50 draws at idle). Verify with
+   `PACE_STUDIES=b node scripts/review-composition.mjs --quick` and `--energy --wpm=90`.
 
 Still open: a real bloom pass for crystal and bubble glints, a stronger glow at
 Pip's feet, denser authored detail in the part of the loop seen while running,

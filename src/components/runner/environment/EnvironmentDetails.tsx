@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { createDetailBatches, createDetailGeometry, floats } from "./detailClusters";
-import { type createLandscapeMaterials } from "./landscapeMaterials";
+import { hasTranslucentDepth, RENDER_ORDER, type createLandscapeMaterials } from "./landscapeMaterials";
 import { FRAGMENT_RATE, type LandscapeMotion } from "./worldMotion";
 import { COMPOSITION_STUDIES, heightAtScreen, nearPassX } from "../composition";
 import { useComposition } from "../CompositionStudy";
@@ -42,8 +42,8 @@ export function EnvironmentDetails({ surfaces, world }: {
   }), [batches, geometries]);
   useLayoutEffect(() => {
     const meshes = (instances.current?.children ?? []) as THREE.InstancedMesh[];
-    meshes.forEach((mesh, i) => {
-      mesh.instanceMatrix.array.set(batches[i].matrices);
+    meshes.forEach(mesh => {
+      mesh.instanceMatrix.array.set(batches[mesh.userData.batch].matrices);
       mesh.instanceMatrix.needsUpdate = true;
     });
     // dispose={null} protects shared geometry/materials, so release the instance
@@ -70,9 +70,17 @@ export function EnvironmentDetails({ surfaces, world }: {
     <group name="EnvironmentalDetails">
       <group ref={instances}>
         {batches.map((batch, i) => (
-          <instancedMesh key={batch.name} name={batch.name}
+          <instancedMesh key={batch.name} name={batch.name} userData={{ batch: i }}
             args={[instancedGeometry[i], surfaces[batch.finish], batch.matrices.length / 16]}
+            renderOrder={batch.finish === "bubble" ? RENDER_ORDER.bubble
+              : hasTranslucentDepth(batch.finish) ? RENDER_ORDER.translucent : 0}
             frustumCulled={false} dispose={null} />
+        ))}
+        {/* Depth-only twins: resin and glass hide whatever lies behind their front layer. */}
+        {batches.map((batch, i) => hasTranslucentDepth(batch.finish) && (
+          <instancedMesh key={`${batch.name} depth`} name={`${batch.name} depth`} userData={{ batch: i }}
+            args={[instancedGeometry[i], surfaces.translucentDepth, batch.matrices.length / 16]}
+            renderOrder={RENDER_ORDER.translucentDepth} frustumCulled={false} dispose={null} />
         ))}
       </group>
       <mesh ref={closeFragment} name="NearMineralFragment" rotation={[0.3, -0.45, -0.2]}
