@@ -3,6 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { type RefObject, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
+import { type PipFace } from "./pipFace";
 import { PipMotion, type PipMotionSignals, type PipStatus } from "./pipMotion";
 
 export type PipMotionRef = RefObject<PipMotionSignals | null>;
@@ -17,13 +18,14 @@ export function usePipMotion(
   status: PipStatus,
   onFinishExit?: () => void,
   sustainedInput = false,
+  face?: PipFace,
 ) {
   const controller = useRef<PipMotion | null>(null);
   const signals = useRef<PipMotionSignals | null>(null);
 
   useLayoutEffect(() => {
     if (!placement.current) return;
-    const motion = new PipMotion(model, placement.current, clips);
+    const motion = new PipMotion(model, placement.current, clips, face);
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const updatePreference = () => { motion.signals.reducedMotion = preference.matches; };
     updatePreference();
@@ -36,7 +38,7 @@ export function usePipMotion(
       controller.current = null;
       signals.current = null;
     };
-  }, [model, placement, clips]);
+  }, [model, placement, clips, face]);
 
   // Explicit order: animation/pose -> sole samples -> shadow and environment.
   // Negative priority preserves R3F's automatic rendering.

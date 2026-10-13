@@ -32,17 +32,29 @@ footstep timer or independent speed curve is involved. Pip's existing smoothed
 acceleration adds a small transient lean; deceleration contributes a little
 compression before recovery, using the original rig and morph targets.
 
+Pip's face and follow-through live in the same controller. Eye shape is written
+to `pipFace.ts` uniforms and applied in the eye shader (`usePipSurface`), which
+scales each eye about its own center before skinning. Blinks come every 2–5 s
+from a deterministic sequence (sometimes doubled), plus one on starting. The
+expression follows existing signals only: a concentrated squint at sprint, eyes
+squeezed shut through a stumble, wide eyes at the finish. A softer bounce spring
+sinks the body a beat after each landing and pops it up on starting and at the
+finish (before the unchanged exit launch); a roll spring rocks it toward the
+landing foot; a slow breath scales it at rest. These move only the Body bone, so
+the feet, contacts and shadow are unchanged. Pip's floor reflection does not blink.
+
 `lastCorrectAt` is a visual intent signal. It lets Pip coast before the existing
 four-second WPM statistic expires; scoring and results calculations are unchanged.
 The finish charge advances in stride cycles, accelerates across the scene, then
 fires its callback once the character's bounding sphere leaves the camera.
 
-Reduced motion suppresses procedural deformation and impact accents, stops
-environmental travel,
+Reduced motion suppresses procedural deformation and impact accents (including
+blinks, expressions, bounce, roll and breath; the eyes ease back to their modeled
+shape), stops environmental travel,
 and reduces clip cadence and stumble amplitude. Materials, lighting and the GLB
 remain unchanged. The current composition study uses a full-viewport camera and
 an oblique view, with foreground overlap outside the physical lane. See the
 [composition notes](environment/README.md) for the three study URLs and review artifacts.
 
-Run `node scripts/check-pip-motion.mjs` to check real-GLB landings at 30/60/120 Hz,
+Run `node scripts/check-pip-motion.mjs` to check real-GLB landings at 30/60/120 Hz, blinks and expressions,
 coasting, error recovery, full-silhouette exits, reset, and reduced motion.
