@@ -1,6 +1,30 @@
 # Landscape and material family
 
-## Target art direction pass (current)
+## Essential world pass (current)
+
+The world read as cluttered, so it is reduced to its essentials: the terrain,
+Pip (with his shadow and reflection) and the light trails. Every other layer is
+switched off in `worldLayers.ts` (`WORLD_LAYERS`), not deleted: formations,
+details (including `NearMineralFragment`), the near banks and the passing-light
+paths (`EnvironmentEnergy`). Layers will be reintroduced one at a time once the
+essentials are polished; turning one back on is a single boolean.
+
+- Without `WesternFold`/`SuspendedStone`, `LayeredOptics` builds no fold capture,
+  and `ForegroundSoftness` has no near meshes, so it draws the frame directly.
+- Draws at idle 50 → 16; triangles about 167k → 92k (desktop, Study B).
+- Pure-function checks (`check-environment`, `check-landscape-topology`) still
+  cover the disabled layers' geometry and budgets.
+- `review-composition` and `review-materials` now read the shared uniforms from
+  `WorldLightTrails`. Reviews that study disabled objects (the pilot sheet/mineral
+  optics, `WorldPassingLight`, foreground visibility in `check-atmosphere-review`)
+  do not apply while those layers are off.
+- Known: the terrain shader still paints the warm/cool pools and the shelf
+  caustic that were placed around the formations.
+
+Verify: `PACE_STUDIES=b node scripts/review-composition.mjs --quick`, then
+`--energy --wpm=90`, and `--mobile --energy --wpm=90`.
+
+## Target art direction pass (retained)
 
 A seven-step pass moved the world and Pip toward the reference image kept
 locally in `target/` (Git-ignored). It deliberately supersedes three earlier
