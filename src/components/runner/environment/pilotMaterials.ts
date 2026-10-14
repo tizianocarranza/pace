@@ -6,9 +6,22 @@ import { type OpticalUniforms } from "./LayeredOptics";
 import { atmosphereField } from "./atmosphere";
 import { energyField } from "./worldEnergy";
 import { WORLD_LAYERS } from "./worldLayers";
+import { floorWarmthField, glslVec as glsl } from "./floorWarmth";
 
 type Shared = ReturnType<typeof createLandscapeMaterials>["terrain"]["uniforms"];
 type Role = "ground" | "sheet" | "mineral";
+
+/** Peach zones on the satin floor cover more of it at speed (sustained energy). */
+const WARM_ZONE_THRESHOLD = [0.45, 0.15] as const;
+/** Dune modeling on the floor. The studio fill and the tone curve's shoulder near
+ * white flattened the slopes, so slopes facing away from the key light take a cool
+ * shade and slopes facing it a slight lift. Identity on flat ground (the lane). */
+export const RELIEF_SHADING = {
+  // Typical slopes change key-light facing by only 0.05–0.1 (TERRAIN_RELIEF is low).
+  gain: 9.0, // how quickly a slope reaches full shade/lift
+  shade: [0.7, 0.72, 0.92], // cool lavender, never grey
+  lift: 0.06,
+} as const;
 
 /** Three opt-in surfaces. Keep the physical BRDF and volume absorption while
  * supplying the existing deformation, thickness estimates and layered capture. */
@@ -86,23 +99,29 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
         vPilotLocal = position;
         vPilotLayer = ${role === "sheet" ? 'step(uOpticalSplit, float(gl_VertexID))' : '0.0'};
         #include <project_vertex>`);
-      shader.fragmentShader = declarations + atmosphereField + energyField + `
+      shader.fragmentShader = declarations + atmosphereField + energyField + floorWarmthField + `
         uniform float uAtmosphere;
         uniform mat4 uPilotWorldToLocal;
         uniform vec3 uPilotCenter;
         uniform vec3 uPilotRadii;
+        uniform vec3 uKeyDirection;
       ` + shader.fragmentShader;
       const variation = role === "ground" ? `
         // A pearl floor with two or three broad, soft zones in view: periwinkle
         // and peach drift past slowly while running. Narrow diagonal bands read
         // as noise; the saturated color belongs to the ribbons and Pip.
+        // Color temperature follows the sustained pace (uEnergy.y): a pale, cool
+        // pearl when slow; the peach zones spread and saturate only when a high
+        // pace is held. Bursts barely change it. The lit grade is applied later.
+        float sustained = uEnergy.y;
         vec2 field = vec2(vPilotWorld.x + uTravel, vPilotWorld.z);
         float cool = smoothstep(0.35, 1.0, 0.5 + 0.5 * sin(field.x * 0.085 + field.y * 0.12 + 0.7));
-        float warm = smoothstep(0.45, 1.0, 0.5 + 0.5 * sin(field.x * 0.11 - field.y * 0.09 + 3.4)) * (1.0 - cool);
+        float warmFrom = mix(${WARM_ZONE_THRESHOLD[0].toFixed(3)}, ${WARM_ZONE_THRESHOLD[1].toFixed(3)}, sustained);
+        float warm = smoothstep(warmFrom, 1.0, 0.5 + 0.5 * sin(field.x * 0.11 - field.y * 0.09 + 3.4)) * (1.0 - cool);
         float outsideLane = smoothstep(0.7, 2.5, abs(vPilotWorld.z));
         float distant = smoothstep(2.0, 14.0, -vPilotWorld.z);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62,0.66,0.98), cool * outsideLane * 0.28);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0,0.78,0.64), warm * outsideLane * 0.22);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62,0.66,0.98), cool * outsideLane * mix(0.20, 0.30, sustained));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0,0.74,0.58), warm * outsideLane * mix(0.08, 0.42, sustained));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78,0.78,0.98), distant * 0.18);
       ` : role === "sheet" ? `
         float density = smoothstep(-2.0,3.0,vPilotLocal.x) * (0.5+0.5*sin(vPilotLocal.z*1.8));
@@ -216,6 +235,18 @@ export function createPilotMaterials(uniforms: Shared, optics: OpticalUniforms) 
           float grazing = pow(1.0-max(dot(normal,normalize(vViewPosition)),0.0),2.0);
           gl_FragColor.rgb += vec3(0.16,0.12,0.075) * sweep * energy * (0.2+grazing*0.8);
         `}
+        ${role === "ground" ? `
+          // Relief shading relative to flat ground, so the level lane is untouched.
+          // The lane mask also keeps contact footprints from shading.
+          vec3 worldNormal = inverseTransformDirection(normal, viewMatrix);
+          float facing = dot(worldNormal, uKeyDirection) - uKeyDirection.y;
+          float dunes = smoothstep(0.6, 1.4, abs(vPilotWorld.z));
+          float shade = clamp(-facing * ${RELIEF_SHADING.gain.toFixed(3)}, 0.0, 1.0) * dunes;
+          float lift = clamp(facing * ${RELIEF_SHADING.gain.toFixed(3)}, 0.0, 1.0) * dunes;
+          gl_FragColor.rgb *= mix(vec3(1.0), ${glsl(RELIEF_SHADING.shade)}, shade) * (1.0 + lift * ${RELIEF_SHADING.lift.toFixed(3)});
+          // Warm grade of the lit floor, reflections included (floorWarmth.ts).
+          gl_FragColor.rgb = floorWarmth(gl_FragColor.rgb, vPilotWorld);
+        ` : ""}
         if (uAtmosphere > 0.5)
           gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.96,0.975,1.0), distanceHaze(vPilotWorld));
         #include <tonemapping_fragment>
