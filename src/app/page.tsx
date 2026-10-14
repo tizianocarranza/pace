@@ -3,6 +3,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useTypingEngine } from "@/hooks/useTypingEngine";
 import { Runner } from "@/components/runner/Runner";
+import { TypingText } from "@/components/typing/TypingText";
 import { getRandomPrompt, PROMPTS } from "@/data/prompts";
 import { resolveVisualSpeed } from "@/lib/visualSpeed";
 
@@ -51,46 +52,39 @@ export default function Home() {
   };
 
   return (
-    <main className="isolate grid min-h-screen grid-rows-[auto_1fr_1fr] bg-white px-12 py-8 text-[#171715] max-sm:px-6 max-sm:py-6">
+    <main className="isolate grid min-h-screen grid-rows-[auto_1fr_1fr] bg-white px-12 py-8 text-[#3d3a55] max-sm:px-6 max-sm:py-6">
       <header className="flex items-center justify-between">
         <span className="text-base font-medium tracking-[-0.04em]">pace.</span>
       </header>
 
       <section className="flex items-center justify-center">
         {!showResults ? (
-          <p className="w-[min(48rem,80vw)] text-center text-[clamp(1.6rem,2.5vw,2.75rem)] leading-[1.2] font-normal tracking-[-0.035em]">
-            <span className="text-[#171715]">
-              {text.slice(0, currentIndex)}
-            </span>
-
-            <span className="relative">
-              {status !== "finished" && (
-                <span
-                  aria-hidden
-                  className="absolute top-[0.08em] -left-[0.02em] h-[0.9em] w-px bg-[#171715]"
-                />
-              )}
-
-              <span className="text-[#d7d7d3]">{text.slice(currentIndex)}</span>
-            </span>
-          </p>
+          <TypingText
+            key={text}
+            text={text}
+            currentIndex={currentIndex}
+            errorCount={errorCount}
+            status={status}
+            intensity={visualSpeed.intensity}
+            className="w-[min(48rem,80vw)] text-center text-[clamp(1.6rem,2.5vw,2.75rem)] leading-[1.3] font-normal tracking-[-0.035em]"
+          />
         ) : (
           <div className="results-enter flex flex-col items-center">
             <div className="text-5xl tabular-nums">{averageWpm}</div>
 
-            <div className="mt-1 text-xs uppercase tracking-[0.18em] text-neutral-400">
+            <div className="mt-1 text-xs uppercase tracking-[0.18em] text-[#a9a5c8]">
               WPM
             </div>
 
             <div className="mt-8 flex gap-8 text-sm">
               <div className="flex flex-col items-center">
                 <span>{accuracy}%</span>
-                <span className="text-neutral-400">accuracy</span>
+                <span className="text-[#a9a5c8]">accuracy</span>
               </div>
 
               <div className="flex flex-col items-center">
                 <span>{elapsedTime.toFixed(1)}s</span>
-                <span className="text-neutral-400">time</span>
+                <span className="text-[#a9a5c8]">time</span>
               </div>
             </div>
 
@@ -117,10 +111,12 @@ export default function Home() {
         />
 
         {status !== "finished" && (
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-3xl tabular-nums">{currentWpm}</span>
+          <div
+            className={`flex flex-col items-center gap-1 transition-opacity duration-500 ${status === "idle" ? "opacity-40" : "opacity-100"}`}
+          >
+            <span className="text-2xl tabular-nums">{currentWpm}</span>
 
-            <span className="text-[10px] tracking-[0.2em] text-neutral-400">
+            <span className="text-[10px] tracking-[0.2em] text-[#a9a5c8]">
               WPM
             </span>
           </div>

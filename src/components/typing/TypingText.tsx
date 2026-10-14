@@ -1,0 +1,245 @@
+"use client";
+
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+
+type TypingTextProps = {
+  text: string;
+  currentIndex: number;
+  errorCount: number;
+  status: "idle" | "running" | "finished";
+  /** Resolved visual intensity from `visualSpeed.ts`; drives the caret glow only. */
+  intensity: number;
+  className?: string;
+};
+
+/** Spring stiffness (rad/s): settles in ~250ms, calm but never a letter behind. */
+const CARET_OMEGA = 16;
+
+type CaretMotion = {
+  x: number; y: number; w: number;
+  vx: number; vy: number; vw: number;
+  tx: number; ty: number; tw: number;
+  raf: number; last: number;
+  placed: boolean; reduced: boolean;
+  wake: () => void;
+};
+
+function applyCaret(caret: HTMLElement, m: CaretMotion) {
+  caret.style.transform = `translate3d(${m.x}px, ${m.y}px, 0)`;
+  caret.style.width = `${m.w}px`;
+}
+
+type Token =
+  | { kind: "word"; start: number; chars: string; order: number }
+  | { kind: "space"; index: number };
+
+function tokenize(text: string) {
+  const tokens: Token[] = [];
+  let order = 0;
+  let start = 0;
+
+  for (let index = 0; index <= text.length; index++) {
+    if (index === text.length || text[index] === " ") {
+      if (index > start) {
+        tokens.push({ kind: "word", start, chars: text.slice(start, index), order: order++ });
+      }
+      if (index < text.length) tokens.push({ kind: "space", index });
+      start = index + 1;
+    }
+  }
+
+  return tokens;
+}
+
+/**
+ * The prompt. Mount it with `key={text}` so a new prompt replays its entrance
+ * and the caret is placed without gliding in from the previous position.
+ */
+export function TypingText({ text, currentIndex, errorCount, status, intensity, className }: TypingTextProps) {
+  const containerRef = useRef<HTMLParagraphElement>(null);
+  const caretRef = useRef<HTMLSpanElement>(null);
+  const tokens = useMemo(() => tokenize(text), [text]);
+
+  // Remember where the latest mistake happened so only that letter flashes,
+  // and only until the player gets past it.
+  const [errorMark, setErrorMark] = useState({ count: errorCount, index: -1 });
+  if (errorMark.count !== errorCount) {
+    setErrorMark({ count: errorCount, index: errorCount > errorMark.count ? currentIndex : -1 });
+  }
+  const erroredHere = errorMark.index === currentIndex;
+
+  // The caret follows its target with a critically damped spring, so it keeps
+  // its momentum between keystrokes and never jerks or overshoots.
+  const motion = useRef<CaretMotion>({
+    x: 0, y: 0, w: 0, vx: 0, vy: 0, vw: 0, tx: 0, ty: 0, tw: 0,
+    raf: 0, last: 0, placed: false, reduced: false, wake: () => {},
+  });
+
+  useLayoutEffect(() => {
+    const caret = caretRef.current;
+    const m = motion.current;
+    if (!caret) return;
+
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onQuery = () => { m.reduced = query.matches; };
+    onQuery();
+    query.addEventListener("change", onQuery);
+
+    // Analytic critically damped step per axis: frame-rate independent.
+    const step = (now: number) => {
+      const dt = Math.min(Math.max((now - m.last) / 1000, 0), 0.05);
+      m.last = now;
+
+      const e = Math.exp(-CARET_OMEGA * dt);
+      let d = m.x - m.tx;
+      let k = m.vx + CARET_OMEGA * d;
+      m.x = m.tx + (d + k * dt) * e;
+      m.vx = (m.vx - CARET_OMEGA * k * dt) * e;
+
+      d = m.y - m.ty;
+      k = m.vy + CARET_OMEGA * d;
+      m.y = m.ty + (d + k * dt) * e;
+      m.vy = (m.vy - CARET_OMEGA * k * dt) * e;
+
+      d = m.w - m.tw;
+      k = m.vw + CARET_OMEGA * d;
+      m.w = m.tw + (d + k * dt) * e;
+      m.vw = (m.vw - CARET_OMEGA * k * dt) * e;
+
+      const settled =
+        Math.abs(m.x - m.tx) < 0.1 && Math.abs(m.y - m.ty) < 0.1 && Math.abs(m.w - m.tw) < 0.1 &&
+        Math.abs(m.vx) < 1 && Math.abs(m.vy) < 1 && Math.abs(m.vw) < 1;
+
+      if (settled) {
+        m.x = m.tx; m.y = m.ty; m.w = m.tw;
+        m.vx = m.vy = m.vw = 0;
+        m.raf = 0;
+      } else {
+        m.raf = requestAnimationFrame(step);
+      }
+
+      applyCaret(caret, m);
+    };
+
+    m.wake = () => {
+      if (m.raf) return;
+      m.last = performance.now();
+      m.raf = requestAnimationFrame(step);
+    };
+
+    return () => {
+      query.removeEventListener("change", onQuery);
+      cancelAnimationFrame(m.raf);
+      m.raf = 0;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const caret = caretRef.current;
+    const m = motion.current;
+    if (!container || !caret) return;
+
+    const place = () => {
+      const atEnd = currentIndex >= text.length;
+      const target = container.querySelector<HTMLElement>(
+        `[data-i="${atEnd ? text.length - 1 : currentIndex}"]`,
+      );
+      if (!target) return;
+
+      // Layout offsets up to the container: unaffected by entrance transforms,
+      // and correct even when an animated word becomes the offsetParent.
+      let left = 0;
+      let top = 0;
+      for (let node: HTMLElement | null = target; node && node !== container; node = node.offsetParent as HTMLElement | null) {
+        left += node.offsetLeft;
+        top += node.offsetTop;
+      }
+
+      // Underline the current letter, taking that letter's width.
+      m.tx = left;
+      m.ty = top + target.offsetHeight * 0.9;
+      m.tw = target.offsetWidth;
+
+      if (!m.placed || m.reduced) {
+        // First placement (and reduced motion) jumps straight into position.
+        m.x = m.tx; m.y = m.ty; m.w = m.tw;
+        m.vx = m.vy = m.vw = 0;
+        m.placed = true;
+        applyCaret(caret, m);
+        caret.dataset.placed = "true";
+        return;
+      }
+
+      m.wake();
+    };
+
+    place();
+
+    const observer = new ResizeObserver(place);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [currentIndex, text]);
+
+  const finished = status === "finished";
+
+  return (
+    <p
+      ref={containerRef}
+      aria-label={text}
+      className={`typing-text relative whitespace-pre-wrap ${finished ? "text-exit" : ""} ${className ?? ""}`}
+      style={{ "--caret-glow": intensity.toFixed(3) } as CSSProperties}
+    >
+      {tokens.map((token) => {
+        if (token.kind === "space") {
+          return (
+            <span key={token.index} data-i={token.index} aria-hidden>
+              {" "}
+            </span>
+          );
+        }
+
+        return (
+          <span
+            key={token.start}
+            aria-hidden
+            className="word-enter inline-block whitespace-nowrap"
+            style={{ animationDelay: `${token.order * 22}ms` }}
+          >
+            {Array.from(token.chars, (char, offset) => {
+              const index = token.start + offset;
+              const state = index < currentIndex ? "char-typed" : "char-pending";
+              const flash = index === currentIndex && erroredHere;
+
+              return (
+                <span
+                  key={flash ? `${index}:${errorCount}` : index}
+                  data-i={index}
+                  className={`char inline-block ${state} ${flash ? "char-error" : ""}`}
+                >
+                  {char}
+                </span>
+              );
+            })}
+          </span>
+        );
+      })}
+
+      <span
+        ref={caretRef}
+        aria-hidden
+        className={`caret pointer-events-none absolute top-0 left-0 ${finished ? "caret-hidden" : ""}`}
+      >
+        <span
+          key={errorCount}
+          className={`block h-full ${erroredHere ? "caret-shake" : ""}`}
+        >
+          <span
+            key={`${currentIndex}:${errorCount}`}
+            className={`caret-bar block h-full ${erroredHere ? "caret-bar-error" : ""}`}
+          />
+        </span>
+      </span>
+    </p>
+  );
+}

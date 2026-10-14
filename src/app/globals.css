@@ -23,8 +23,165 @@ body {
   animation: results-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Typing prompt */
+
+.typing-text {
+  /* Drawn from the world: Pip's eyes, the pearl haze, violet → blue light, warm peach. */
+  --ink: #3d3a55;
+  --pending: #c9c5e3;
+  --miss: #f0906a;
+  --caret-from: #a493f2;
+  --caret-to: #4a74e6;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 600ms var(--ease-out), filter 600ms var(--ease-out);
+}
+
+.typing-text.text-exit {
+  opacity: 0.2;
+  filter: blur(2px);
+}
+
+.char {
+  transition: color 180ms var(--ease-out);
+}
+
+.char-pending {
+  color: var(--pending);
+}
+
+.char-typed {
+  color: var(--ink);
+  animation: char-settle 450ms ease-out backwards;
+}
+
+.char-error {
+  animation: char-miss 420ms var(--ease-out) both;
+}
+
+/* The letter soaks in from the lavender haze to ink: colour only, no movement. */
+@keyframes char-settle {
+  from {
+    color: var(--pending);
+  }
+
+  to {
+    color: var(--ink);
+  }
+}
+
+@keyframes char-miss {
+  0%,
+  35% {
+    color: var(--miss);
+  }
+
+  to {
+    color: var(--pending);
+  }
+}
+
+.word-enter {
+  animation: word-enter 520ms var(--ease-out) backwards;
+}
+
+@keyframes word-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.25em);
+    filter: blur(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.caret {
+  height: max(2px, 0.07em);
+  transition: opacity 200ms var(--ease-out);
+  /* Position and width are driven by a spring in TypingText, not transitions. */
+  will-change: transform;
+}
+
+.caret.caret-hidden {
+  opacity: 0;
+}
+
+.caret-bar {
+  position: relative;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--caret-from), var(--caret-to));
+  box-shadow: 0 0 calc(2px + var(--caret-glow, 0) * 12px)
+    rgb(164 147 242 / calc(0.15 + var(--caret-glow, 0) * 0.55));
+  /* Solid while keys keep coming; starts pulsing after a short pause. */
+  animation: caret-blink 2.4s ease-in-out 500ms infinite;
+}
+
+/* Gradients don't interpolate, so the miss tint is an overlay that fades out. */
+.caret-bar-error::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--miss);
+  animation: caret-miss 420ms var(--ease-out) both;
+}
+
+.caret-shake {
+  animation: caret-shake 260ms var(--ease-out);
+}
+
+@keyframes caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes caret-miss {
+  0%,
+  35% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes caret-shake {
+  20% {
+    transform: translateX(-2.5px);
+  }
+
+  45% {
+    transform: translateX(2.5px);
+  }
+
+  70% {
+    transform: translateX(-1.5px);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .results-enter {
+  .results-enter,
+  .word-enter,
+  .char-typed,
+  .caret-shake {
     animation: none;
+  }
+
+  .typing-text.text-exit {
+    filter: none;
   }
 }
