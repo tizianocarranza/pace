@@ -26,18 +26,74 @@ essentials are polished; turning one back on is a single boolean.
   ribbons that follow the terrain, sway, twist like silk and lengthen with
   `uEnergy.x`; waves run on `uEnergyPhase`. Each recycles fully off frame. Still
   one draw, about 900 triangles, skipped at idle and under reduced motion.
-- The production floor (`pilot.ground` in `pilotMaterials.ts`) is a calm satin
-  pearl: two slow, broad periwinkle/peach zones (two or three in view, never
-  bands) replace the narrow diagonal cobalt basins, plus a faint lavender with
-  distance. A softer clear coat (0.45, roughness 0.22) and roughness 0.38 stop
-  the studio cards mirroring as hard streaks. The shelf caustic at z ≈ −1.85
-  returns only with `WORLD_LAYERS.formations`.
+- **Production floor.** It is the analytic terrain (`surfaces.terrain`,
+  `landscapeShaders.ts`), drawn without tone mapping in every material mode:
+  the Current look, lighter and better modelled. Pip keeps the Pilot lighting
+  (studio IBL, low ambient, hemisphere bounce, rims). Only the ground mesh uses
+  `surfaces.terrain` while formations are off; re-enabling a terrain-finish
+  formation would also make it untonemapped.
+- **Satin floor (off).** The satin floor (`pilot.ground` in
+  `pilotMaterials.ts`) is behind `WORLD_LAYERS.satinGround`. It is a calm pearl:
+  - Two slow, broad periwinkle/peach zones (two or three in view, never bands)
+    plus a faint lavender with distance.
+  - A soft clear coat (0.45, roughness 0.22) and roughness 0.38.
+  - The shelf caustic at z ≈ −1.85 returns only with `WORLD_LAYERS.formations`.
+- **Speed tiers.** The world now makes typing speeds read differently without
+  adding objects. There are two levers:
+  - **Ribbon count.** `WorldEnergy.tier` is a slow memory of the resolved
+    intensity: it rises at 1.2/s and falls at 0.8/s, so jitter cannot flicker a
+    ribbon at its entry point. Each `LIGHT_TRAILS` entry has an entry intensity,
+    so the number of ribbons reads as a speed meter:
+
+    | WPM | Ribbons |
+    | ---: | ---: |
+    | 15 | 1 (the low one at Pip's feet) |
+    | 30 | 2 |
+    | 45 | 3 |
+    | 60 | 5 |
+    | 90 | 7 |
+
+    Ribbons widen slightly with the tier. `uEnergy.x` now only gates idle and
+    coasting, so the single slow ribbon stays readable.
+  - **Ribbon clock.** Ribbons run on `WorldEnergy.trailDistance` (`uTrailTravel`),
+    an unwrapped clock that adds `velocity × (1 + 0.7 × tier)` each frame. They
+    drift with the floor when slow and overtake it in a sprint. The old
+    `uTravel` clock wrapped at 72 and made every ribbon jump on each lap.
+  - **Color temperature.** Sustained energy (`uEnergy.y`) warms the floor.
+    `floorWarmth()` (`floorWarmth.ts`, tuning in `FLOOR_WARMTH`) is shared by
+    both floor finishes:
+    - On the terrain it runs before the distance air, so far ground stays
+      pale.
+    - On the satin floor it runs on the lit color. Tinting only the satin
+      albedo was invisible: its clear coat and image-based light dominate.
+
+    It has two parts:
+    - **Grade.** A warm grade that multiplies the floor color. It is identity
+      at zero energy, so idle, reduced motion and `energy=off` are unchanged.
+    - **Wake.** A warm wake trailing Pip, centered at x ≈ −2.6 and gated by
+      `uEnergy.y²`. It is also multiplied, never mixed toward white.
+
+    The satin floor's peach zones also spread with sustained energy (threshold
+    0.45 → 0.15). Slow typing keeps the cool floor; only a held sprint warms it.
+  - **Limits.** Both levers derive from `LandscapeMotion` through `WorldEnergy`,
+    with no new draws or triangles. `check-environment` asserts the ribbon
+    count per pace step, the tier progression, and the idle and reduced-motion
+    resets.
+- **Relief shading (satin floor only).** The terrain shader already models its
+  slopes. On the satin floor they read flat: typical slopes change key-light
+  facing by only 0.05–0.1, which the studio fill and the tone curve swallowed.
+  `RELIEF_SHADING` (`pilotMaterials.ts`) handles it:
+  - Slopes facing away from `uKeyDirection` take a cool lavender shade.
+  - Slopes facing it get a slight lift.
+  - The lane (|z| < 0.6) is masked.
 - Review modes: `review-composition.mjs --quick` loads the legacy
-  `materials=current` study (shader terrain, no atmosphere). Only `--energy`
-  captures show the production pilot floor.
+  `materials=current` study (shader terrain, no atmosphere, old Pip lighting).
+  `--energy` captures show production: terrain floor, Pilot lighting on Pip.
 
 Verify: `PACE_STUDIES=b node scripts/review-composition.mjs --quick`, then
-`--energy --wpm=90`, and `--mobile --energy --wpm=90`.
+`--energy --wpm=90`, and `--mobile --energy --wpm=90`. For the speed tiers,
+capture the ladder `--energy --wpm=15|30|45|60|90` and compare ribbon count and
+floor warmth.
 
 ## Target art direction pass (retained)
 

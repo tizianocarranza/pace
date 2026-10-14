@@ -7,6 +7,11 @@ export class WorldEnergy {
   // Strength, sustained coherence, acceleration catch, local interruption.
   readonly value = new Vector4();
   phase = 0;
+  /** Slow memory of the resolved intensity; it decides how many ribbons are present.
+   * Slower than momentum, so typing jitter cannot flicker a ribbon at its entry point. */
+  tier = 0;
+  /** Unwrapped ribbon clock: drifts with the floor when slow, overtakes it when fast. */
+  trailDistance = 0;
   private seenStumble = 0;
 
   update(delta: number, motion: PipMotionSignals | null, world: LandscapeMotion, status: PipStatus) {
@@ -16,7 +21,8 @@ export class WorldEnergy {
     this.seenStumble = sequence;
     if (status === "idle" || !motion?.active || motion.reducedMotion) {
       this.value.set(0, 0, 0, 0);
-      if (status === "idle") this.phase = 0;
+      this.tier = 0;
+      if (status === "idle") this.phase = this.trailDistance = 0;
       return;
     }
     const intensity = MathUtils.clamp(world.intensity, 0, 1);
@@ -27,6 +33,8 @@ export class WorldEnergy {
     energy.y = MathUtils.damp(energy.y, target * target, target > energy.y ? 0.9 : 1.1, dt);
     energy.z = MathUtils.damp(energy.z, Math.max(0, intensity - world.lag), 5, dt);
     energy.w = interrupted ? 1 : MathUtils.damp(energy.w, 0, 3.6, dt);
+    this.tier = MathUtils.damp(this.tier, intensity, intensity > this.tier ? 1.2 : 0.8, dt);
+    this.trailDistance += dt * world.velocity * (1 + 0.7 * this.tier);
     // All light paths use this clock. Travel still comes from the physical world.
     this.phase = (this.phase + dt * (world.velocity * 0.095)) % (Math.PI * 2);
   }

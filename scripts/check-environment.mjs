@@ -13,6 +13,7 @@ for (const [name, file] of [
   ['terrainProfile', 'src/components/runner/environment/terrainProfile.ts'],
   ['landscape', 'src/components/runner/environment/landscape.ts'],
   ['worldLighting', 'src/components/runner/environment/worldLighting.ts'],
+  ['floorWarmth', 'src/components/runner/environment/floorWarmth.ts'],
   ['landscapeShaders', 'src/components/runner/environment/landscapeShaders.ts'],
   ['atmosphere', 'src/components/runner/environment/atmosphere.ts'],
   ['landscapeMaterials', 'src/components/runner/environment/landscapeMaterials.ts'],
@@ -22,6 +23,7 @@ for (const [name, file] of [
   ['worldInteractions', 'src/components/runner/environment/worldInteractions.ts'],
   ['worldEnergy', 'src/components/runner/environment/worldEnergy.ts'],
   ['energyGeometry', 'src/components/runner/environment/energyGeometry.ts'],
+  ['trailShaders', 'src/components/runner/environment/trailShaders.ts'],
   ['composition', 'src/components/runner/composition.ts'],
 ]) {
   const source = await fs.readFile(file, 'utf8');
@@ -30,7 +32,7 @@ for (const [name, file] of [
   });
   await fs.writeFile(path.join(compiled, `${name}.mjs`), outputText
     .replace('"../pipContacts"', '"./pipContacts.mjs"')
-    .replace(/"\.\/(landscape|landscapeShaders|worldLighting|terrainProfile|worldMotion|worldInteractions|worldEnergy|atmosphere)"/g, '"./$1.mjs"'));
+    .replace(/"\.\/(landscape|landscapeShaders|worldLighting|terrainProfile|worldMotion|worldInteractions|worldEnergy|atmosphere|floorWarmth)"/g, '"./$1.mjs"'));
 }
 const { LandscapeMotion, FORMATIONS, FORMATION_HEIGHT_SCALE, WORLD_PERIOD, GROUND_Y, terrainHeight, createTerrain, createFormation, createNearBank } =
   await import(pathToFileURL(path.join(compiled, 'landscape.mjs')));
@@ -276,6 +278,7 @@ console.log(`Landscape passed: ${triangles} triangles, safe physical lane, perio
 // errors and suppression without altering any physical/contact signal.
 const { WorldEnergy } = await import(pathToFileURL(path.join(compiled, 'worldEnergy.mjs')));
 const { createEnergyGeometry, ENERGY_PATHS } = await import(pathToFileURL(path.join(compiled, 'energyGeometry.mjs')));
+const { LIGHT_TRAILS, TRAIL_ENTRY_WIDTH } = await import(pathToFileURL(path.join(compiled, 'trailShaders.mjs')));
 const snapshots = [];
 for (const fps of [30, 60, 120]) {
   const energy = new WorldEnergy(), world = new LandscapeMotion();
@@ -290,12 +293,19 @@ for (const fps of [30, 60, 120]) {
     }
   };
   advance(1); assert.equal(value.x, 0, 'quiet world has exactly no energy');
-  const levels = [];
+  const levels = [], tiers = [];
+  let trail = energy.trailDistance;
   for (const wpm of [15, 30, 45, 60, 90]) {
     signal.intent = wpmToIntensity(wpm); advance(7);
-    levels.push(value.x);
+    levels.push(value.x); tiers.push(energy.tier);
+    assert(energy.trailDistance > trail, 'the ribbon clock only moves forward');
+    trail = energy.trailDistance;
   }
   assert(levels.every((n, i) => !i || n > levels[i - 1]), 'smoothly increasing vocabulary');
+  assert(tiers.every((n, i) => !i || n > tiers[i - 1]), 'ribbon tiers rise with pace');
+  // Settled tiers turn into a readable ribbon count (more than half faded in).
+  const ribbons = tiers.map(tier => LIGHT_TRAILS.filter(([, , , , , entry]) => tier >= entry + TRAIL_ENTRY_WIDTH / 2).length);
+  assert.deepEqual(ribbons, [1, 2, 3, 5, 7], 'ribbon count steps with pace');
   assert(levels[0] < 0.12 && levels[3] > 0.8, 'subtle 15; established energy at 60');
   assert(levels[4] / levels[3] > 1.15 && levels[4] / levels[3] < 1.25, '90 has restrained headroom within the same vocabulary');
   signal.stumbleSequence++; advance(1 / fps);
@@ -315,11 +325,13 @@ for (const fps of [30, 60, 120]) {
   signal.reducedMotion = true; signal.stumbleSequence++;
   energy.update(1 / fps, signal, world, 'running');
   assert.deepEqual(value.toArray(), [0, 0, 0, 0]);
+  assert.equal(energy.tier, 0, 'reduced motion keeps no ribbons');
   signal.reducedMotion = false;
   energy.update(1 / fps, signal, world, 'running');
   assert.equal(value.w, 0, 'suppressed errors do not replay');
   energy.update(1 / fps, signal, world, 'idle');
   assert.deepEqual(value.toArray(), [0, 0, 0, 0]); assert.equal(energy.phase, 0);
+  assert.equal(energy.tier, 0); assert.equal(energy.trailDistance, 0, 'idle resets the ribbon clock');
 }
 assert(Math.max(...snapshots) - Math.min(...snapshots) < 0.002, 'frame-rate independent energy');
 const energyGeometry = createEnergyGeometry();

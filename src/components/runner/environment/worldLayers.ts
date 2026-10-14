@@ -7,4 +7,7 @@ export const WORLD_LAYERS = {
   nearBanks: false, // defocused foreground banks
   passingLight: false, // EnvironmentEnergy: six light paths through the formations
   lightTrails: true,
+  // Pilot's satin floor (pilot.ground). Off: the analytic terrain reads lighter and
+  // better modelled; Pip keeps the Pilot lighting either way.
+  satinGround: false,
 } as const;

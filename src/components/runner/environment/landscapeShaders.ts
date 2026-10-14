@@ -2,6 +2,7 @@ import { terrainField } from "./terrainProfile";
 import { interactionField } from "./worldInteractions";
 import { energyField } from "./worldEnergy";
 import { atmosphereField } from "./atmosphere";
+import { floorWarmthField } from "./floorWarmth";
 
 export const landscapeVertex = /* glsl */ `
   uniform float uTravel;
@@ -124,6 +125,7 @@ export const landscapeFragment = /* glsl */ `
   varying vec3 vLocal;
   varying float vFilament;
   ${energyField}
+  ${floorWarmthField}
   ${atmosphereField}
 
   // Broad reflection lobes use the shared world light directions. No scene capture.
@@ -335,6 +337,10 @@ export const landscapeFragment = /* glsl */ `
     float pathClarity = 1.0 - smoothstep(0.4, 1.5, abs(vWorld.z));
     float diffusion = (warmPool * 0.08 + amberPool * 0.14 + transmittedPool * 0.1) * (1.0 - pathClarity * 0.72);
     color = mix(color, mix(uWarmLight, vec3(1.0), 0.76), diffusion);
+    #if defined(TERRAIN) && !defined(FOREGROUND)
+      // The production floor warms with the sustained pace, before distance air.
+      color = floorWarmth(color, vWorld);
+    #endif
     float legacyAir = smoothstep(3.0, 28.0, -vWorld.z);
     vec3 air = mix(uCoolLight, vec3(1.0), 0.88);
     if (uAtmosphere > 0.5) {

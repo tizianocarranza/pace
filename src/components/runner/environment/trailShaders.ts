@@ -2,27 +2,31 @@ import { BufferAttribute, BufferGeometry } from "three";
 import { terrainField } from "./terrainProfile";
 import { energyField } from "./worldEnergy";
 
-// Lane depth, height above the terrain, full length, seed, width. Wide wind
+// Lane depth, height above the terrain, full length, seed, width, entry. Wide wind
 // ribbons drift behind Pip at several heights; one low ribbon passes his feet.
+// Entry is the resolved intensity (via WorldEnergy.tier) at which a ribbon fades
+// in, so the count reads as a speed meter: 1 at 15 WPM, 2 at 30, 3 at 45, ~5 at
+// 60, ~6 at 75 and all 7 at 90. The low ribbon is the first; the highest the last.
 export const LIGHT_TRAILS = [
-  [-1.0, 0.22, 12.0, 0.11, 0.3], [-1.5, 0.55, 15.0, 0.47, 0.45],
-  [-2.1, 0.35, 13.0, 0.83, 0.4], [-2.7, 0.8, 16.0, 0.29, 0.5],
-  [-3.4, 0.5, 14.0, 0.65, 0.45], [-1.25, 0.9, 10.0, 0.91, 0.3],
-  [1.1, 0.07, 9.0, 0.38, 0.12],
+  [1.1, 0.07, 9.0, 0.38, 0.12, 0.28], [-1.0, 0.22, 12.0, 0.11, 0.3, 0.45],
+  [-2.1, 0.35, 13.0, 0.83, 0.4, 0.58], [-1.5, 0.55, 15.0, 0.47, 0.45, 0.68],
+  [-3.4, 0.5, 14.0, 0.65, 0.45, 0.74], [-2.7, 0.8, 16.0, 0.29, 0.5, 0.86],
+  [-1.25, 0.9, 10.0, 0.91, 0.3, 0.95],
 ] as const;
+export const TRAIL_ENTRY_WIDTH = 0.07;
 
 const SEGMENTS = 64;
 
 /** One immutable ribbon batch; flow, sway and twist happen in the shader. */
 export function createTrailGeometry() {
   const positions: number[] = [], styles: number[] = [], widths: number[] = [], indices: number[] = [];
-  LIGHT_TRAILS.forEach(([z, height, length, seed, width]) => {
+  LIGHT_TRAILS.forEach(([z, height, length, seed, width, entry]) => {
     const start = positions.length / 3;
     for (let i = 0; i <= SEGMENTS; i++) {
       for (const side of [-1, 1]) {
         positions.push(i / SEGMENTS, side, 0);
         styles.push(z, height, length, seed);
-        widths.push(width);
+        widths.push(width, entry);
       }
       if (i < SEGMENTS) {
         const a = start + i * 2;
@@ -33,30 +37,36 @@ export function createTrailGeometry() {
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new BufferAttribute(new Float32Array(positions), 3));
   geometry.setAttribute("trailStyle", new BufferAttribute(new Float32Array(styles), 4));
-  geometry.setAttribute("trailWidth", new BufferAttribute(new Float32Array(widths), 1));
+  geometry.setAttribute("trailShape",new BufferAttribute(new Float32Array(widths), 2));
   geometry.setIndex(indices);
   return geometry;
 }
 
 export const trailVertex = /* glsl */ `
   attribute vec4 trailStyle;
-  attribute float trailWidth;
+  attribute vec2 trailShape; // width, entry
   uniform float uTravel;
+  uniform float uTrailTravel;
+  uniform float uEnergyTier;
   varying vec2 vUv;
   varying vec3 vWorld;
   varying float vSeed;
   varying float vTwist;
+  varying float vPresence;
   ${terrainField}
   ${energyField}
   void main() {
     float t = position.x;
     float seed = trailStyle.w;
     float energy = uEnergy.x;
+    // Ribbons join one by one as the sustained pace rises.
+    vPresence = smoothstep(trailShape.y, trailShape.y + ${TRAIL_ENTRY_WIDTH.toFixed(2)}, uEnergyTier);
     // Tails lengthen as speed builds. The period leaves room for the longest
-    // tail, so a ribbon always recycles entirely outside the frame.
+    // tail, so a ribbon always recycles entirely outside the frame. The clock is
+    // unwrapped: wrapping at the terrain period would jump every ribbon.
     float span = 44.0 + trailStyle.z;
     float rate = 1.3 + seed * 0.5;
-    float head = mod(seed * span - uTravel * rate, span) - 22.0 - trailStyle.z;
+    float head = mod(seed * span - uTrailTravel * rate, span) - 22.0 - trailStyle.z;
     float s = t * trailStyle.z * mix(0.6, 1.0, energy);
     // Waves travel down the ribbon on the velocity clock (integer harmonics of
     // uEnergyPhase stay continuous across its wrap). Faster reads straighter.
@@ -71,7 +81,9 @@ export const trailVertex = /* glsl */ `
     float twist = sin(s * 0.4 - wave + seed * 3.0) * 1.1;
     vTwist = cos(twist);
     float taper = sqrt(sin(3.14159265 * t));
-    vec3 p = center + vec3(0.0, cos(twist), sin(twist)) * position.y * trailWidth * 0.5 * (0.3 + 0.7 * taper);
+    // The sprint ribbons read a little broader, not only more numerous.
+    float width = trailShape.x * (0.85 + 0.3 * uEnergyTier);
+    vec3 p = center + vec3(0.0, cos(twist), sin(twist)) * position.y * width * 0.5 * (0.3 + 0.7 * taper);
     vUv = vec2(t, position.y);
     vSeed = seed;
     vWorld = p;
@@ -89,6 +101,7 @@ export const trailFragment = /* glsl */ `
   varying vec3 vWorld;
   varying float vSeed;
   varying float vTwist;
+  varying float vPresence;
   ${energyField}
   void main() {
     // Soft entry at the head (t = 0: ribbons flow backward), long fading tail.
@@ -109,7 +122,10 @@ export const trailFragment = /* glsl */ `
     vec2 screen = gl_FragCoord.xy / uResolution;
     float frame = smoothstep(0.12, 0.24, screen.y) * (1.0 - smoothstep(0.66, 0.76, screen.y));
     float edges = 1.0 - smoothstep(16.0, 22.0, abs(vWorld.x));
-    alpha *= uEnergy.x * frame * edges * uVisibility * energyContinuity(vWorld);
+    // The ribbon count carries the speed; energy only gates idle/coasting, so the
+    // single ribbon at a slow pace still reads instead of vanishing.
+    float gate = smoothstep(0.0, 0.15, uEnergy.x) * mix(0.55, 1.0, uEnergy.x);
+    alpha *= gate * vPresence * frame * edges * uVisibility * energyContinuity(vWorld);
     gl_FragColor = vec4(color, alpha);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>

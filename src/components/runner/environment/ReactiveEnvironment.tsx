@@ -62,7 +62,9 @@ export function ReactiveEnvironment({ motion, status }: {
   useLayoutEffect(() => { liveUniforms.current = surfaces.terrain.uniforms; }, [surfaces]);
   useEffect(() => {
     for (const surface of Object.values(surfaces)) {
-      surface.toneMapped = materialMode !== "current";
+      // The analytic terrain keeps its untonemapped Current look in every mode;
+      // Pip and the other surfaces follow the selected study.
+      surface.toneMapped = surface !== surfaces.terrain && materialMode !== "current";
       surface.needsUpdate = true;
     }
   }, [surfaces, materialMode]);
@@ -82,9 +84,12 @@ export function ReactiveEnvironment({ motion, status }: {
       live.uVisibility.value = world.visibility;
       live.uPhase.value = world.phase;
       live.uMomentum.value.set(world.intensity, world.lag);
+      const energyOff = energyMode === "off" || composition.gray;
       live.uEnergy.value.copy(energy.value);
-      if (energyMode === "off" || composition.gray) live.uEnergy.value.set(0, 0, 0, 0);
+      if (energyOff) live.uEnergy.value.set(0, 0, 0, 0);
       live.uEnergyPhase.value = energy.phase;
+      live.uEnergyTier.value = energyOff ? 0 : energy.tier;
+      live.uTrailTravel.value = energy.trailDistance;
       live.uCompositionGray.value = composition.gray ? 1 : 0;
       live.uAtmosphere.value = atmosphere === "off" ? 0 : 1;
       updateLightingUniforms(live as ReturnType<typeof createLightingUniforms>, world);
@@ -131,7 +136,7 @@ export function ReactiveEnvironment({ motion, status }: {
           <bufferAttribute attach="attributes-normal" args={[terrain.normals, 3]} />
           <bufferAttribute attach="index" args={[terrain.indices, 1]} />
         </bufferGeometry>
-        <primitive object={materialMode === "pilot" ? pilot.ground : surfaces.terrain} attach="material" />
+        <primitive object={materialMode === "pilot" && WORLD_LAYERS.satinGround ? pilot.ground : surfaces.terrain} attach="material" />
       </mesh>
       <group ref={formations}>
         {WORLD_LAYERS.formations && FORMATIONS.map((form, i) => {
