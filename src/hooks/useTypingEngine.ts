@@ -1,141 +1,112 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-type Keystroke = {
-  timestamp: number;
-  correct: boolean;
-};
+import { useCallback, useEffect, useRef, useState } from "react";
+import { accuracy as accuracyOf, averageWpm as averageWpmOf, LIVE_WINDOW_MS, liveWpm } from "@/lib/typingStats";
 
 type UseTypingEngineOptions = {
   text: string;
 };
 
-const WPM_WINDOW = 4_000;
+/** How often the live WPM is re-read while it can still change. */
+const TICK_MS = 100;
+
+/** The run as the key handler sees it: always current, even between renders. */
+type Run = {
+  text: string;
+  index: number;
+  startedAt: number | null;
+  correct: number;
+  total: number;
+  /** Timestamps of correct keys still inside the live window, oldest first. */
+  recent: number[];
+};
+
+const freshRun = (text: string): Run => ({ text, index: 0, startedAt: null, correct: 0, total: 0, recent: [] });
 
 export function useTypingEngine({ text }: UseTypingEngineOptions) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [keystrokes, setKeystrokes] = useState<Keystroke[]>([]);
-  const [startedAt, setStartedAt] = useState<number | null>(null);
   const [errorCount, setErrorCount] = useState(0);
+  const [correct, setCorrect] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const [lastCorrectAt, setLastCorrectAt] = useState<number | null>(null);
+  const [currentWpm, setCurrentWpm] = useState(0);
+  /** True while the live WPM may still move; the ticker sleeps otherwise. */
+  const [live, setLive] = useState(false);
 
-  const correctCharacters = useRef(0);
-  const totalCharacters = useRef(0);
-
-  const [now, setNow] = useState(() => Date.now());
+  const run = useRef<Run>(freshRun(text));
 
   useEffect(() => {
-    if (startedAt === null || currentIndex >= text.length) {
-      return;
-    }
+    run.current.text = text;
+  }, [text]);
 
-    const interval = window.setInterval(() => {
-      setNow(Date.now());
-    }, 100);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [startedAt, currentIndex, text.length]);
-
-  const handleKey = useCallback(
-    (key: string) => {
-      if (currentIndex >= text.length) return;
-      if (key.length !== 1) return;
-
-      const now = Date.now();
-
-      if (startedAt === null) {
-        setStartedAt(now);
-      }
-
-      const isCorrect = key === text[currentIndex];
-
-      totalCharacters.current += 1;
-
-      if (isCorrect) {
-        correctCharacters.current += 1;
-
-        const nextIndex = currentIndex + 1;
-
-        setCurrentIndex(nextIndex);
-
-        if (nextIndex >= text.length) {
-          setFinishedAt(now);
-        }
-      } else {
-        setErrorCount((count) => count + 1);
-      }
-
-      setKeystrokes((previous) => [
-        ...previous.filter(
-          (keystroke) => now - keystroke.timestamp <= WPM_WINDOW,
-        ),
-        {
-          timestamp: now,
-          correct: isCorrect,
-        },
-      ]);
-    },
-    [currentIndex, startedAt, text],
-  );
-
-  const reset = useCallback(() => {
-    setCurrentIndex(0);
-    setKeystrokes([]);
-    setStartedAt(null);
-    setFinishedAt(null);
-    setErrorCount(0);
-    setNow(Date.now());
-
-    correctCharacters.current = 0;
-    totalCharacters.current = 0;
+  /** Re-reads the live WPM; React only re-renders when the shown integer changes. */
+  const measure = useCallback((now: number) => {
+    const r = run.current;
+    while (r.recent.length > 0 && now - r.recent[0] >= LIVE_WINDOW_MS) r.recent.shift();
+    const wpm = liveWpm(r.recent, now, r.startedAt, r.correct);
+    setCurrentWpm(wpm);
+    return wpm;
   }, []);
 
-  const elapsedTime = useMemo(() => {
-    if (startedAt === null) return 0;
+  useEffect(() => {
+    if (!live) return;
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      const wpm = measure(now);
+      // Rest once the last key has left the window; the next key wakes the ticker.
+      if (wpm === 0 && run.current.recent.length === 0) setLive(false);
+    }, TICK_MS);
+    return () => window.clearInterval(interval);
+  }, [live, measure]);
 
-    const endTime = finishedAt ?? now;
+  // Stable, and reads the run from the ref, so fast keys never see a stale index.
+  const handleKey = useCallback((key: string) => {
+    const r = run.current;
+    if (r.index >= r.text.length || key.length !== 1) return;
 
-    return (endTime - startedAt) / 1000;
-  }, [startedAt, finishedAt, now]);
-
-  const currentWpm = useMemo(() => {
-    const recentCorrectKeystrokes = keystrokes.filter(
-      (keystroke) =>
-        keystroke.correct && now - keystroke.timestamp <= WPM_WINDOW,
-    );
-
-    const minutes = WPM_WINDOW / 60_000;
-
-    return Math.round(recentCorrectKeystrokes.length / 5 / minutes);
-  }, [keystrokes, now]);
-
-  const averageWpm = useMemo(() => {
-    if (startedAt === null || correctCharacters.current === 0) {
-      return 0;
+    const now = Date.now();
+    if (r.startedAt === null) {
+      r.startedAt = now;
+      setStartedAt(now);
     }
 
-    const elapsedMinutes = elapsedTime / 60;
-
-    if (elapsedMinutes <= 0) return 0;
-
-    return Math.round(correctCharacters.current / 5 / elapsedMinutes);
-  }, [elapsedTime]);
-
-  const accuracy =
-    totalCharacters.current === 0
-      ? 100
-      : Math.round((correctCharacters.current / totalCharacters.current) * 100);
-
-  // A visual-only intent signal. WPM, accuracy and completion retain their rules.
-  const lastCorrectAt = useMemo(() => {
-    for (let index = keystrokes.length - 1; index >= 0; index--) {
-      if (keystrokes[index].correct) return keystrokes[index].timestamp;
+    r.total += 1;
+    if (key === r.text[r.index]) {
+      r.correct += 1;
+      r.index += 1;
+      r.recent.push(now);
+      setCurrentIndex(r.index);
+      setLastCorrectAt(now);
+      if (r.index >= r.text.length) setFinishedAt(now);
+    } else {
+      setErrorCount((count) => count + 1);
     }
-    return null;
-  }, [keystrokes]);
+    setCorrect(r.correct);
+    setTotal(r.total);
+
+    measure(now);
+    setLive(r.index < r.text.length);
+  }, [measure]);
+
+  const reset = useCallback(() => {
+    run.current = freshRun(run.current.text);
+    setCurrentIndex(0);
+    setErrorCount(0);
+    setCorrect(0);
+    setTotal(0);
+    setStartedAt(null);
+    setFinishedAt(null);
+    setLastCorrectAt(null);
+    setCurrentWpm(0);
+    setLive(false);
+  }, []);
+
+  // Results only: the time is read once the run is finished.
+  const elapsedTime = startedAt === null || finishedAt === null ? 0 : (finishedAt - startedAt) / 1000;
+  const averageWpm = averageWpmOf(correct, startedAt, finishedAt);
+  const accuracy = accuracyOf(correct, total);
 
   const status: "idle" | "finished" | "running" =
     currentIndex === 0
