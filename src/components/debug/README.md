@@ -23,3 +23,17 @@ and temporarily suspends the simulator. Real typing still works while it is enab
 
 Run `node scripts/check-visual-speed.mjs`, `node scripts/check-pip-motion.mjs`
 and `node scripts/check-environment.mjs` for mapping, controller and momentum checks.
+
+## Orb debugger
+
+Inside **Pace Debug**, open **Orb** to tune the WPM orb live
+(`src/components/typing/orbTuning.ts`). **Fixed preview level** pins the fill
+(0–100%) instead of following the game; **Replay rise** empties the orb at once
+and lets it rise to the current target, to judge the motion. Sliders cover the
+rise springs (level, front/back puffs, tilt, billow), the cloud filter (edge
+distortion, noise scale and morph, softness, density) and the look (opacity,
+sphere edge, drift and breathing periods, three colors).
+**Fixed warmth** pins the orb's warm tint (normally the floor's warmth).
+**Copy changed values** copies only what differs from `ORB_DEFAULTS` as JSON,
+to paste back as new defaults. **Reset all** restores them. Nothing is stored;
+reload starts from the defaults. Production always uses `ORB_DEFAULTS`.

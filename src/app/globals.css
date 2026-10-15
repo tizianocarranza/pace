@@ -23,9 +23,7 @@ body {
   animation: results-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Typing prompt */
-
-.typing-text {
+:root {
   /* Drawn from the world: Pip's eyes, the pearl haze, violet → blue light, warm peach. */
   --ink: #3d3a55;
   --pending: #c9c5e3;
@@ -33,6 +31,11 @@ body {
   --caret-from: #a493f2;
   --caret-to: #4a74e6;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Typing prompt */
+
+.typing-text {
   transition: opacity 600ms var(--ease-out), filter 600ms var(--ease-out);
 }
 
@@ -117,6 +120,152 @@ body {
     rgb(164 147 242 / calc(0.15 + var(--caret-glow, 0) * 0.55));
   /* Solid while keys keep coming; starts pulsing after a short pause. */
   animation: caret-blink 2.4s ease-in-out 500ms infinite;
+}
+
+/* Live WPM counter: an orb that fills with living cloud. WpmCounter's springs write
+   --wpm-fill (the resolved intensity), --orb-y (cloud body top, view-box units),
+   --orb-y-front / --orb-y-back (puff rows chasing it), --orb-wave (puff swell) and
+   --orb-tilt (lean while charging). Drift, breathing and the noise are CSS/SVG. */
+
+/* Two halos, a tight one that makes the sphere glow and a wide soft bloom, both
+   brightening with the fill (scaled by --orb-halo) and warming from lavender toward the
+   floor's peach with --orb-warmth. */
+.wpm-orb-svg {
+  --orb-glow: calc(var(--orb-halo, 1) * (0.12 + var(--wpm-fill, 0) * 0.88));
+  filter:
+    drop-shadow(0 0 calc(4px + var(--wpm-fill, 0) * 6px)
+      color-mix(in oklab, rgb(164 147 242 / calc(var(--orb-glow) * 0.45)),
+        rgb(247 154 92 / calc(var(--orb-glow) * 0.45)) calc(var(--orb-warmth, 0) * 70%)))
+    drop-shadow(0 0 calc(8px + var(--wpm-fill, 0) * 18px)
+      color-mix(in oklab, rgb(164 147 242 / calc(var(--orb-glow) * 0.35)),
+        rgb(247 154 92 / calc(var(--orb-glow) * 0.35)) calc(var(--orb-warmth, 0) * 70%)));
+}
+
+.wpm-orb-cloud {
+  /* An empty orb stays perfectly still, with no puff peeking over the edge. */
+  opacity: min(var(--orb-cloud-max, 1), calc(var(--wpm-fill, 0) * 25));
+}
+
+/* The orb's contents, a touch lit, so the pale cloud reads as luminous rather than grey.
+   On the parent group: the cloud's own SVG filter attribute must not be overridden. */
+.wpm-orb-lit {
+  filter: brightness(var(--orb-cloud-light, 1.06)) saturate(1.15);
+}
+
+.wpm-orb-body {
+  transform: translateY(calc(var(--orb-y, 100) * 1px));
+}
+
+.wpm-orb-front {
+  transform: translateY(calc(var(--orb-y-front, 100) * 1px));
+}
+
+.wpm-orb-back {
+  transform: translateY(calc(var(--orb-y-back, 100) * 1px));
+}
+
+/* Leans around the orb's center (view-box units). */
+.wpm-orb-tilt {
+  transform-origin: 50px 50px;
+  transform: rotate(var(--orb-tilt, 0deg));
+}
+
+.wpm-orb-swell {
+  transform: scaleY(var(--orb-wave, 0.75));
+}
+
+.wpm-orb-drift-back {
+  opacity: 0.8;
+  animation: orb-drift-back var(--orb-drift-back, 16s) linear infinite;
+}
+
+.wpm-orb-drift-front {
+  animation: orb-drift-front var(--orb-drift-front, 10s) linear infinite;
+}
+
+.wpm-orb-puff {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orb-breathe var(--orb-breathe, 6s) ease-in-out infinite;
+}
+
+/* The number. Each column stacks two slots; WpmCounter swaps them when the digit
+   changes, so the old one blurs out as the new one eases in. Pale lavender on an empty
+   orb, near-white as the cloud rises, with a glow that warms with it. */
+.wpm-orb-digits {
+  --orb-digit-h: 1.35em;
+  display: flex;
+  font-size: 1.6rem;
+  font-weight: 500;
+  line-height: var(--orb-digit-h);
+  color: color-mix(in oklab, #b3acdf, #fdfcff calc(min(1, var(--wpm-fill, 0) * 2.5) * 100%));
+  text-shadow: 0 0 calc(var(--orb-number-glow, 1) * 7px)
+    color-mix(in oklab, rgb(150 132 236 / 0.55), rgb(240 140 90 / 0.55) calc(var(--orb-warmth, 0) * 70%));
+}
+
+.wpm-orb-col {
+  display: grid;
+  place-items: center;
+  width: 0.62em;
+  height: var(--orb-digit-h);
+  transition: width 450ms var(--ease-out), opacity 450ms var(--ease-out);
+}
+
+/* Unused leading columns collapse, so the number re-centers as it gains digits. */
+.wpm-orb-digits[data-digits="1"] .wpm-orb-col:not([data-col="0"]),
+.wpm-orb-digits[data-digits="2"] .wpm-orb-col[data-col="2"] {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.wpm-orb-slot {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--orb-digit-fade, 320ms) var(--ease-out),
+    filter var(--orb-digit-fade, 320ms) var(--ease-out),
+    transform var(--orb-digit-fade, 320ms) var(--ease-out);
+}
+
+/* Leaves drifting up into a blur; enters from just below, already blurred. */
+.wpm-orb-slot[data-state="out"] {
+  opacity: 0;
+  filter: blur(3px);
+  transform: translateY(-0.08em);
+}
+
+.wpm-orb-slot[data-state="enter"] {
+  opacity: 0;
+  filter: blur(3px);
+  transform: translateY(0.08em);
+  transition: none;
+}
+
+@keyframes orb-drift-front {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50px); }
+}
+
+@keyframes orb-drift-back {
+  from { transform: translateX(-50px); }
+  to { transform: translateX(0); }
+}
+
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18, 1.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wpm-orb-drift-back,
+  .wpm-orb-drift-front,
+  .wpm-orb-puff {
+    animation: none;
+  }
+
+  .wpm-orb-slot {
+    transition: none;
+  }
 }
 
 /* Gradients don't interpolate, so the miss tint is an overlay that fades out. */

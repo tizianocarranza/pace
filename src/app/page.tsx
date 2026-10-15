@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useTypingEngine } from "@/hooks/useTypingEngine";
 import { Runner } from "@/components/runner/Runner";
 import { TypingText } from "@/components/typing/TypingText";
+import { WpmCounter } from "@/components/typing/WpmCounter";
 import { getRandomPrompt, PROMPTS } from "@/data/prompts";
 import { resolveVisualSpeed } from "@/lib/visualSpeed";
 
@@ -55,6 +56,14 @@ export default function Home() {
     <main className="isolate grid min-h-screen grid-rows-[auto_1fr_1fr] bg-white px-12 py-8 text-[#3d3a55] max-sm:px-6 max-sm:py-6">
       <header className="flex items-center justify-between">
         <span className="text-base font-medium tracking-[-0.04em]">pace.</span>
+        <a
+          href="https://github.com/tizianocarranza"
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs tracking-[0.02em] text-[#a9a5c8] transition-colors duration-300 hover:text-[#3d3a55] focus-visible:text-[#3d3a55]"
+        >
+          by Tiziano Carranza
+        </a>
       </header>
 
       <section className="flex items-center justify-center">
@@ -111,15 +120,11 @@ export default function Home() {
         />
 
         {status !== "finished" && (
-          <div
-            className={`flex flex-col items-center gap-1 transition-opacity duration-500 ${status === "idle" ? "opacity-40" : "opacity-100"}`}
-          >
-            <span className="text-2xl tabular-nums">{currentWpm}</span>
-
-            <span className="text-[10px] tracking-[0.2em] text-[#a9a5c8]">
-              WPM
-            </span>
-          </div>
+          <WpmCounter
+            wpm={currentWpm}
+            intensity={visualSpeed.intensity}
+            className={`transition-opacity duration-500 ${status === "idle" ? "opacity-40" : "opacity-100"}`}
+          />
         )}
       </section>
       {WpmSimulator && (

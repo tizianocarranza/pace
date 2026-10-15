@@ -11,6 +11,7 @@ import { updateLightingUniforms, type createLightingUniforms } from "./worldLigh
 import { WorldInteractions } from "./worldInteractions";
 import { WorldEnergy } from "./worldEnergy";
 import { LightTrails } from "./LightTrails";
+import { worldTone } from "./worldTone";
 
 /** A fixed window into a continuous landscape, independent of Pip's placement. */
 export function ReactiveEnvironment({ motion, status }: {
@@ -26,6 +27,8 @@ export function ReactiveEnvironment({ motion, status }: {
   useLayoutEffect(() => { liveUniforms.current = surfaces.terrain.uniforms; }, [surfaces]);
   // Shared primitive materials are manually owned; R3F owns the mesh buffers.
   useEffect(() => () => Object.values(surfaces).forEach(surface => surface.dispose()), [surfaces]);
+  // The world is gone: its warmth no longer applies to the orb.
+  useEffect(() => () => worldTone.publish(0), []);
   useFrame(({ size, gl }, delta) => {
     const world = controller.current ?? (controller.current = new LandscapeMotion());
     world.update(delta, motion.current, status);
@@ -39,6 +42,7 @@ export function ReactiveEnvironment({ motion, status }: {
       live.uEnergyPhase.value = energy.phase;
       live.uEnergyTier.value = energy.tier;
       live.uTrailTravel.value = energy.trailDistance;
+      worldTone.publish(energy.value.y);
       updateLightingUniforms(live as ReturnType<typeof createLightingUniforms>, world);
       const dpr = gl.getPixelRatio();
       live.uResolution.value.set(size.width * dpr, size.height * dpr);
