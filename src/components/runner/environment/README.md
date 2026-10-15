@@ -66,6 +66,11 @@ was deleted in the unused-layer clean up (see "History" below).
     with no new draws or triangles. `check-environment` asserts the ribbon
     count per pace step, the tier progression, and the idle and reduced-motion
     resets.
+- **Orb warmth.** `ReactiveEnvironment` publishes `energy.value.y` (the same
+  sustained energy `floorWarmth()` reads) through `worldTone.ts` every frame. The
+  WPM orb (`src/components/typing/WpmCounter.tsx`) mixes its colors toward
+  `FLOOR_WARMTH.grade` by that value, so the orb and the floor warm and cool
+  together. Publishing only wakes the orb when the value changes; no allocation.
 - **Traveling catch.** `energySweep` adds a narrow moving reflection inside the
   pools and one shelf caustic at z ≈ −1.85; it vanishes exactly at zero energy.
 

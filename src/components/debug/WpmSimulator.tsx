@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import OrbDebugger from "./OrbDebugger";
 
 /** Imported only by the development build. No typing-engine state is writable here. */
 export default function WpmSimulator({ value, onChange, finished }: {
@@ -17,7 +18,7 @@ export default function WpmSimulator({ value, onChange, finished }: {
 
   return (
     <aside aria-label="Pace development tools" onKeyDown={event => event.stopPropagation()}
-      className="fixed top-4 right-4 z-50 max-w-[calc(100vw-2rem)] rounded border border-neutral-200 bg-white/95 p-3 text-xs text-neutral-600 shadow-sm">
+      className="fixed top-16 right-4 z-50 max-w-[calc(100vw-2rem)] rounded border border-neutral-200 bg-white/95 p-3 text-xs text-neutral-600 shadow-sm">
       <details>
         <summary className="cursor-pointer select-none">Pace Debug</summary>
         <fieldset disabled={finished} className="mt-3 w-56 space-y-3 disabled:opacity-50">
@@ -38,6 +39,7 @@ export default function WpmSimulator({ value, onChange, finished }: {
           </div>
         </fieldset>
         {finished && <p className="mt-2">Simulation pauses during results.</p>}
+        <OrbDebugger />
       </details>
     </aside>
   );
