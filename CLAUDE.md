@@ -19,9 +19,9 @@ Stack: Next 16 (App Router, read AGENTS.md), React 19, @react-three/fiber 9,
 - `src/components/debug/` — development-only WPM simulator.
 - `scripts/` — Node checks (`check-*.mjs`) and headless visual reviews (`review-*.mjs`).
 
-`src/components/runner/environment/README.md` is a phase log. Its top section
-("Target art direction pass") is the current state; older phases are retained history
-and are superseded wherever they disagree.
+`src/components/runner/environment/README.md` describes the current world (terrain,
+light pools, light trails, speed tiers). Its "History" section lists the removed layers
+and the commit to restore them from.
 
 ## Invariants (do not break without being asked)
 
@@ -60,7 +60,7 @@ and are superseded wherever they disagree.
 
 ## Working conventions
 
-- Composition Study B (camera, framing, formation anchors) is approved and locked.
+- Composition Study B (camera, framing, light-pool anchors) is approved and locked.
 - Keep the walking corridor level (`GROUND_Y`, 0.018 below `PIP_FLOOR_Y`).
 - Review artifacts (`assets/reviews/`) and the reference image (`target/`) are Git-ignored.
 - After a change, run the relevant checks — see the `pace-visual-review` skill.

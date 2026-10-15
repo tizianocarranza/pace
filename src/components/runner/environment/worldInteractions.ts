@@ -4,7 +4,7 @@ import { type PipMotionSignals, type PipStatus } from "../pipMotion";
 import { type LandscapeMotion } from "./worldMotion";
 
 export const IMPULSE_CAPACITY = 8;
-export type PhysicalImpulse = {
+type PhysicalImpulse = {
   position: THREE.Vector3;
   originX: number;
   distanceAtBirth: number;
@@ -101,24 +101,6 @@ export const interactionField = /* glsl */ `
       vec2 q = d / width;
       float height = -0.035 * event.z * envelope * exp(-dot(q, q));
       response += vec3(height, height * -2.0 * d / (width * width));
-    }
-    return response;
-  }
-  vec2 fragmentResponse(vec3 point) {
-    vec2 response = vec2(0.0);
-    for (int i = 0; i < ${IMPULSE_CAPACITY}; i++) {
-      vec4 event = uImpulses[i];
-      if (event.z <= 0.0) continue;
-      vec4 config = uImpulseParameters[i];
-      vec3 d = point - vec3(event.x, config.w, event.y);
-      float distanceToContact = length(d);
-      if (distanceToContact >= config.x) continue;
-      float age = event.w - distanceToContact * 0.065;
-      if (age <= 0.0) continue;
-      float local = pow(1.0 - smoothstep(0.0, config.x, distanceToContact), 2.0);
-      float settle = exp(-7.5 * age) * sin(age * 12.0) * (1.0 - smoothstep(0.65, 1.0, event.w / config.y));
-      float energy = event.z * local * settle;
-      response += vec2(0.12 * energy, 0.14 * energy * d.x / max(distanceToContact, 0.01));
     }
     return response;
   }

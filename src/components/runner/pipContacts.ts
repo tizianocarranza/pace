@@ -5,7 +5,7 @@ export const PIP_FLOOR_Y = -0.88;
 // body grows upward and the floor, world and framing stay where they are.
 export const PIP_SOLE_Y = PIP_FLOOR_Y + 0.008;
 
-export type FootContact = {
+type FootContact = {
   point: THREE.Vector3;
   height: number;
   previousHeight: number;

@@ -29,11 +29,11 @@ The world consumes each sequence once; `stumbleSequence` advances only when an
 actual Stumble starts, so repeated errors during recovery do not repeat impacts.
 `PipShadow` retains its
 contact shading. The [landscape](environment/README.md) preserves a level corridor
-under those contacts and surrounds it with continuous terrain and larger 3D formations.
+under those contacts and surrounds it with continuous terrain.
 
 The environment's `WorldInteractions` consumes these same contacts after world
-momentum updates. Its fixed impulse pool drives local terrain compression and
-delayed nearby mineral responses through shared uniforms. No extra sampler,
+momentum updates. Its fixed impulse pool drives local terrain compression
+through shared uniforms. No extra sampler,
 footstep timer or independent speed curve is involved. Pip's existing smoothed
 acceleration adds a small transient lean; deceleration contributes a little
 compression before recovery, using the original rig and morph targets.
@@ -59,9 +59,9 @@ Reduced motion suppresses procedural deformation and impact accents (including
 blinks, expressions, bounce, roll and breath; the eyes ease back to their modeled
 shape), stops environmental travel,
 and reduces clip cadence and stumble amplitude. Materials, lighting and the GLB
-remain unchanged. The current composition study uses a full-viewport camera and
-an oblique view, with foreground overlap outside the physical lane. See the
-[composition notes](environment/README.md) for the three study URLs and review artifacts.
+remain unchanged. The approved composition (Study B, `composition.ts`) uses a
+full-viewport camera and an oblique view. See the [landscape notes](environment/README.md)
+for the world and how to review it.
 
 Run `node scripts/check-pip-motion.mjs` to check real-GLB landings at 30/60/120 Hz, blinks and expressions,
 coasting, error recovery, full-silhouette exits, reset, and reduced motion.

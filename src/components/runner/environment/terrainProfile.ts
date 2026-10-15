@@ -4,7 +4,7 @@ import { PIP_FLOOR_Y } from "../pipContacts";
 export const WORLD_PERIOD = 72;
 export const GROUND_Y = PIP_FLOOR_Y - 0.018;
 // The world reads as a thin glossy sheet with low swells, not a field of dunes.
-export const TERRAIN_RELIEF = 0.32;
+const TERRAIN_RELIEF = 0.32;
 
 // Center, width, base/amplitude, lateral drift/frequency, height frequency/phase, bank skew.
 // Broad masses carry a few narrow shoulders and incised channels. No random noise.

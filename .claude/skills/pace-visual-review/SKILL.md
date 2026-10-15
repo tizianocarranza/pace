@@ -1,6 +1,6 @@
 ---
 name: pace-visual-review
-description: How to verify a change in Pace — which check scripts to run per area, how to capture headless visual reviews, the dev-only comparison query params, and how to add a new Off/On study toggle. Use after changing Pip, the environment, visual speed, or before writing a phase note.
+description: How to verify a change in Pace — which check scripts to run per area, how to capture headless visual reviews and compare them before/after. Use after changing Pip, the environment, visual speed, or before writing a README note.
 ---
 
 # Verifying changes in Pace
@@ -14,10 +14,9 @@ visual reviews (need the dev server and Chrome). Run commands from the repo root
 |---|---|
 | `src/lib/visualSpeed.ts`, simulator | `node scripts/check-visual-speed.mjs` |
 | Pip motion, contacts, stumble, finish, `usePip*` | `node scripts/check-pip-motion.mjs` |
-| Terrain, formations, details, world motion/energy, budgets, composition | `node scripts/check-environment.mjs` |
-| Formation geometry (folds, arches) | `node scripts/check-landscape-topology.mjs` (also runs check-environment) |
+| Terrain, light pools, world motion/energy, light trails, budgets, composition | `node scripts/check-environment.mjs` |
 
-When unsure, run all four. Also run `npm run lint`. A check that fails is a real regression
+When unsure, run all three. Also run `npm run lint`. A check that fails is a real regression
 unless the change intentionally moved that target; then update the assertion *and* say why
 in the README.
 
@@ -27,67 +26,33 @@ be added to that list.
 ## 2. Headless visual review
 
 Requirements: `npm run dev` on port 3000, Chrome at
-`C:/Program Files/Google/Chrome/Application/chrome.exe` (scripts use SwiftShader, so numbers
+`C:/Program Files/Google/Chrome/Application/chrome.exe` (the script uses SwiftShader, so numbers
 are structural — draws, triangles, allocations — not real FPS).
 
-- `PACE_REVIEW_DIR` — output folder (default per script). Use a new folder per comparison,
-  under `assets/reviews/` (Git-ignored).
-- `PACE_REVIEW_PORT` — Chrome debugging port for `review-materials` (default 9226).
-- `PACE_STUDIES=b` — limit composition reviews to the approved study.
-
-`node scripts/review-materials.mjs [flags]`
-- `--energy` (with `--wpm=60` or `--wpm=90`), `--atmosphere`, `--geometry`, `--quick`, `--ablate`
-- Example: `PACE_REVIEW_DIR=assets/reviews/<topic>/60 node scripts/review-materials.mjs --energy --wpm=60`
-
 `node scripts/review-composition.mjs [flags]`
-- `--mobile` (390×844), `--quick` (idle/2s/3s/neutral), `--energy`, `--atmosphere`,
-  `--wpm=N`, `--overlap`
-- Mobile sprint: `PACE_STUDIES=b node scripts/review-composition.mjs --mobile --energy --wpm=90`
+- `--mobile` (390×844), `--quick` (idle/2s/3s only, no traversal video), `--wpm=N`
+  (simulated speed, default 60)
+- `PACE_REVIEW_DIR` — output folder (default `assets/reviews/composition`). Use a new folder
+  per comparison, under `assets/reviews/` (Git-ignored).
+- Mobile sprint: `node scripts/review-composition.mjs --quick --mobile --wpm=90`
 
-Comparison checks (need a matching review dir and, for some, a frozen `baseline/`):
-`check-energy-review.mjs` (uses `sharp`), `check-atmosphere-review.mjs`,
-`check-geometry-review.mjs`, `check-material-review.mjs`
-(`--baseline=<dir>`, `--nested-fold-budget`, `--same-submissions`).
-
-Both review scripts exit non-zero if the page logs errors or WebGL warnings
-(`GL_INVALID`, feedback loops). Treat any of those as a failure.
+The script exits non-zero if the page logs errors or WebGL warnings (`GL_INVALID`, feedback
+loops). Treat any of those as a failure.
 
 After capturing, actually look at the PNGs (open them) — at least idle, steady 60, and 90.
 
-## 3. Dev comparison query params (development only)
+## 3. Before/after comparisons
 
-| Param | Values | Default |
-|---|---|---|
-| `composition` (with `compositionReview=1`) | `a`, `b`, `c` | `b` |
-| `materials` | see `MaterialStudy.tsx` (`current`, …, `pilot`) | production mode |
-| `atmosphere` | `off`, `haze`, `on` | `on` |
-| `energy` | `off`, `surfaces`, `on` | `on` |
-| `gray` | `1` removes world color | off |
+There are no in-app comparison toggles. To compare a change, capture the same flags into two
+folders: one before editing (or with the change stashed) and one after. The captures are
+clock-stepped, so `travel`, draws and triangles in each `*-quick.json` must match exactly
+unless the change meant to move them; diff the PNGs with `sharp` (available through `next`).
 
-Switching modes must not reset time, pose, contacts or travel. The WPM simulator lives in the
-"Pace Debug" panel (top-right); use it instead of real typing for repeatable speeds.
+The WPM simulator lives in the "Pace Debug" panel (top-right); use it instead of real typing
+for repeatable speeds. `window.__paceReview` exposes `{ camera, scene, renderer, raycaster }`
+in development for the capture harness only. Never read it from gameplay code.
 
-`window.__paceReview` exposes `{ camera, scene, renderer, raycaster }` in development for the
-capture harness only. Never read it from gameplay code.
-
-## 4. Adding a new Off/On study toggle
-
-Copy `EnergyStudy.tsx` (simplest) or `AtmosphereStudy.tsx` (with Context):
-
-1. `type XMode = "off" | ... | "on"`; a unique window event name `pace-<name>-study`.
-2. `snapshot()` returns the production mode when `NODE_ENV !== "development"`, otherwise reads
-   the query param.
-3. `useSyncExternalStore(subscribe, snapshot, () => productionMode)` — subscribe to the custom
-   event and `popstate`.
-4. Controls component returns `null` outside development, stops `keydown`/`keyup`
-   propagation, writes the param with `history.replaceState` and dispatches the event.
-5. Consume the mode by changing uniforms/visibility in the existing frame update — never by
-   remounting the world.
-6. Mount the controls in `Runner.tsx` next to the others; place them so panels don't overlap.
-7. Make the legacy review scripts request the old mode explicitly so previous baselines stay
-   comparable.
-
-## 5. Writing it up
+## 4. Writing it up
 
 Update the current section of `src/components/runner/environment/README.md` (or
 `runner/README.md` for Pip) with: what changed and why, what was deliberately left alone,

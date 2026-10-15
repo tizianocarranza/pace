@@ -4,13 +4,12 @@
  * Effects own these changes and restore their previous settings on cleanup. */
 /* eslint-disable react-hooks/immutability */
 
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { useMaterialStudy } from "../MaterialStudy";
 
 /** Linear HDR studio illumination; no downloaded HDRI and no visible sky geometry. */
-export function createStudioTexture() {
+function createStudioTexture() {
   const width = 512, height = 256;
   const pixels = new Float32Array(width * height * 4);
   const cards = [
@@ -53,37 +52,29 @@ export function createStudioTexture() {
 
 export function StudioEnvironment() {
   const { gl, scene } = useThree();
-  const mode = useMaterialStudy();
-  const environment = useRef<THREE.WebGLRenderTarget | null>(null);
   useLayoutEffect(() => {
     const previous = { environment: scene.environment, background: scene.background, intensity: scene.environmentIntensity,
-      output: gl.outputColorSpace, tone: gl.toneMapping, exposure: gl.toneMappingExposure, transmission: gl.transmissionResolutionScale };
+      output: gl.outputColorSpace, tone: gl.toneMapping, exposure: gl.toneMappingExposure };
     const generator = new THREE.PMREMGenerator(gl);
     const source = createStudioTexture();
     const target = generator.fromEquirectangular(source);
     target.texture.name = "Pace / studio PMREM";
     source.dispose(); generator.dispose();
-    environment.current = target;
+    scene.environment = target.texture;
+    scene.environmentIntensity = 0.8;
     scene.background = new THREE.Color("white");
     gl.outputColorSpace = THREE.SRGBColorSpace;
     // Neutral keeps white at white and preserves accent hue; ACES greyed the
     // high-key field and desaturated the cobalt/peach accents.
     gl.toneMapping = THREE.NeutralToneMapping;
     gl.toneMappingExposure = 1;
-    // One shared native transmission capture, quarter of the full pixel area.
-    gl.transmissionResolutionScale = 0.5;
     return () => {
       scene.environment = previous.environment; scene.background = previous.background;
       scene.environmentIntensity = previous.intensity;
       gl.outputColorSpace = previous.output; gl.toneMapping = previous.tone;
-      gl.toneMappingExposure = previous.exposure; gl.transmissionResolutionScale = previous.transmission;
-      environment.current = null; target.dispose();
+      gl.toneMappingExposure = previous.exposure;
+      target.dispose();
     };
   }, [gl, scene]);
-  useLayoutEffect(() => {
-    scene.environment = mode === "current" ? null : environment.current?.texture ?? null;
-    scene.environmentIntensity = mode === "current" ? 1 : 0.8;
-    scene.userData.materialStudy = mode;
-  }, [mode, scene]);
   return null;
 }

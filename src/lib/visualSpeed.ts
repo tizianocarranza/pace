@@ -1,6 +1,6 @@
 type GameStatus = "idle" | "running" | "finished";
 
-export const FULL_VISUAL_WPM = 90;
+const FULL_VISUAL_WPM = 90;
 
 /** One curve for every visual consumer; statistics always keep the original WPM. */
 export function wpmToIntensity(wpm: number) {

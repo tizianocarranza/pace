@@ -102,11 +102,10 @@ for (const fps of [30, 60, 120]) {
   f.motion.dispose();
 }
 
-for (const { width, height, study } of [[390, 844], [1536, 1024], [2560, 1080]]
-  .flatMap(([width, height]) => ['a', 'b', 'c'].map(study => ({ width, height, study })))) {
+for (const [width, height] of [[390, 844], [1536, 1024], [2560, 1080]]) {
   const aspect = width / height;
   const f = fixture(aspect);
-  frameComposition(f.camera, width, height, study);
+  frameComposition(f.camera, width, height);
   f.error(); f.tick();
   let completions = 0;
   for (let i = 0; i < 360; i++) if (f.tick(1 / 60, 0.2, 'finished')) completions++;
