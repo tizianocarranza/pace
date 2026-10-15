@@ -1,18 +1,19 @@
 import * as THREE from "three";
-import { FORMATIONS, type LandscapeMotion } from "./landscape";
+import { type LandscapeMotion } from "./worldMotion";
 
 /** Shared palette and directions for Pip's real lights and the landscape shaders. */
 export const WORLD_LIGHT = {
-  ambient: 1.38,
-  key: { color: "#fffaf4", intensity: 1.95, position: [-3.5, 5, 4] as [number, number, number] },
-  warm: { color: "#ffc596", intensity: 0.32, position: [-4, 2.5, -3] as [number, number, number] },
-  cool: { color: "#c3d2ff", intensity: 0.38, position: [4, 2, 3] as [number, number, number] },
+  key: { color: "#fffaf4", position: [-3.5, 5, 4] as [number, number, number] },
+  warm: { color: "#ffc596", position: [-4, 2.5, -3] as [number, number, number] },
+  cool: { color: "#c3d2ff", position: [4, 2, 3] as [number, number, number] },
 };
 
-// Bounce sources belong to existing world objects; no new emitters/meshes or particles.
-const warmFold = FORMATIONS.find(form => form.name === "WesternFold")!;
-const coolArch = FORMATIONS.find(form => form.name === "EasternBridge")!;
-const amberStone = FORMATIONS.find(form => form.name === "DistantStone")!;
+// Ground bounce pools, at world x before travel. They scroll with the terrain.
+const WARM_POOL = [-7.8, 0.3, -4.2] as const;
+const COOL_POOL = [5.5, 0.7, -4.5] as const;
+const AMBER_POOL = [2, 5.2, -12] as const;
+const TRANSMITTED_OFFSET = 4.18;
+const TRANSMITTED_POOL = [WARM_POOL[0] + TRANSMITTED_OFFSET, -0.6, -2.2] as const;
 
 export function createLightingUniforms() {
   return {
@@ -21,16 +22,16 @@ export function createLightingUniforms() {
     uCoolDirection: { value: new THREE.Vector3(...WORLD_LIGHT.cool.position).normalize() },
     uWarmLight: { value: new THREE.Color(WORLD_LIGHT.warm.color) },
     uCoolLight: { value: new THREE.Color(WORLD_LIGHT.cool.color) },
-    uWarmPool: { value: new THREE.Vector3(warmFold.x, 0.3, warmFold.z) },
-    uCoolPool: { value: new THREE.Vector3(coolArch.x, 0.7, coolArch.z) },
-    uAmberPool: { value: new THREE.Vector3(amberStone.x, amberStone.lift, amberStone.z) },
-    uTransmittedPool: { value: new THREE.Vector3(warmFold.x + warmFold.width * 0.38, -0.6, warmFold.z + 2.0) },
+    uWarmPool: { value: new THREE.Vector3(...WARM_POOL) },
+    uCoolPool: { value: new THREE.Vector3(...COOL_POOL) },
+    uAmberPool: { value: new THREE.Vector3(...AMBER_POOL) },
+    uTransmittedPool: { value: new THREE.Vector3(...TRANSMITTED_POOL) },
   };
 }
 
 export function updateLightingUniforms(uniforms: ReturnType<typeof createLightingUniforms>, world: LandscapeMotion) {
-  uniforms.uWarmPool.value.x = world.formationX(warmFold.x);
-  uniforms.uCoolPool.value.x = world.formationX(coolArch.x);
-  uniforms.uAmberPool.value.x = world.formationX(amberStone.x);
-  uniforms.uTransmittedPool.value.x = world.formationX(warmFold.x) + warmFold.width * 0.38;
+  uniforms.uWarmPool.value.x = world.wrapX(WARM_POOL[0]);
+  uniforms.uCoolPool.value.x = world.wrapX(COOL_POOL[0]);
+  uniforms.uAmberPool.value.x = world.wrapX(AMBER_POOL[0]);
+  uniforms.uTransmittedPool.value.x = world.wrapX(WARM_POOL[0]) + TRANSMITTED_OFFSET;
 }

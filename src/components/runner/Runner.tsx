@@ -5,12 +5,8 @@ import { useLayoutEffect } from "react";
 import * as THREE from "three";
 import { Pip } from "./Pip";
 import { EnvironmentLighting } from "./environment/EnvironmentLighting";
-import { frameComposition, type CompositionStudy } from "./composition";
-import { CompositionContext, useCompositionSelection } from "./CompositionStudy";
-import { MaterialStudyContext, MaterialStudyControls, useMaterialSelection } from "./MaterialStudy";
+import { frameComposition } from "./composition";
 import { StudioEnvironment } from "./environment/StudioEnvironment";
-import { AtmosphereContext, AtmosphereControls, useAtmosphereSelection } from "./AtmosphereStudy";
-import { EnergyControls } from "./EnergyStudy";
 
 type RunnerProps = {
   intensity: number;
@@ -22,7 +18,7 @@ type RunnerProps = {
   className?: string;
 };
 
-function StudioFraming({ study }: { study: CompositionStudy }) {
+function StudioFraming() {
   const { camera, size, scene, gl, raycaster } = useThree();
   useLayoutEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -33,9 +29,9 @@ function StudioFraming({ study }: { study: CompositionStudy }) {
   }, [camera, scene, gl, raycaster]);
   useLayoutEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return;
-    frameComposition(camera, size.width, size.height, study);
+    frameComposition(camera, size.width, size.height);
     return () => camera.clearViewOffset();
-  }, [camera, size.width, size.height, study]);
+  }, [camera, size.width, size.height]);
   return null;
 }
 export function Runner({
@@ -47,9 +43,6 @@ export function Runner({
   onFinishExit,
   className,
 }: RunnerProps) {
-  const composition = useCompositionSelection();
-  const materialMode = useMaterialSelection();
-  const atmosphere = useAtmosphereSelection();
   return (
     <div className={`relative ${className ?? ""}`} style={{ width: "100%" }}>
       <div className="pointer-events-none fixed inset-0 -z-10">
@@ -62,29 +55,20 @@ export function Runner({
             camera.lookAt(0, 0, 0);
           }}
         >
-          <CompositionContext.Provider value={composition}>
-            <MaterialStudyContext.Provider value={materialMode}>
-              <AtmosphereContext.Provider value={atmosphere}>
-                <StudioFraming study={composition.study} />
-                <StudioEnvironment />
-                <EnvironmentLighting />
+          <StudioFraming />
+          <StudioEnvironment />
+          <EnvironmentLighting />
 
-                <Pip
-                  intensity={intensity}
-                  sustainedInput={sustainedInput}
-                  lastCorrectAt={lastCorrectAt}
-                  errorCount={errorCount}
-                  status={status}
-                  onFinishExit={onFinishExit}
-                />
-              </AtmosphereContext.Provider>
-            </MaterialStudyContext.Provider>
-          </CompositionContext.Provider>
+          <Pip
+            intensity={intensity}
+            sustainedInput={sustainedInput}
+            lastCorrectAt={lastCorrectAt}
+            errorCount={errorCount}
+            status={status}
+            onFinishExit={onFinishExit}
+          />
         </Canvas>
       </div>
-      <MaterialStudyControls mode={materialMode} />
-      <AtmosphereControls mode={atmosphere} />
-      <EnergyControls />
     </div>
   );
 }

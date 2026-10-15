@@ -1,10 +1,10 @@
 /** GLSL literal for a fixed-size tuple, e.g. vec3(1.000, 0.920, 0.800). */
-export const glslVec = (values: readonly number[]) => `vec${values.length}(${values.map(n => n.toFixed(3)).join(", ")})`;
+const glslVec = (values: readonly number[]) => `vec${values.length}(${values.map(n => n.toFixed(3)).join(", ")})`;
 
 /** How far the floor warms with the sustained pace (uEnergy.y). The grade and the
  * wake multiply the lit color, so reflections warm too; tinting only an albedo was
  * lost under the satin clear coat. Both are identity at zero energy. */
-export const FLOOR_WARMTH = {
+const FLOOR_WARMTH = {
   grade: [1.07, 0.92, 0.8], // whole floor at a held sprint
   wake: [1.18, 0.8, 0.58], // trailing Pip, gated by sustained²
   wakeStrength: 0.7,
