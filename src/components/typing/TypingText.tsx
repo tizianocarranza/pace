@@ -1,6 +1,9 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { APPROVED_ERROR_STYLE, errorStyle } from "./errorStyle";
+
+const approvedStyle = () => APPROVED_ERROR_STYLE;
 
 type TypingTextProps = {
   text: string;
@@ -60,11 +63,22 @@ export function TypingText({ text, currentIndex, errorCount, status, intensity, 
   const caretRef = useRef<HTMLSpanElement>(null);
   const tokens = useMemo(() => tokenize(text), [text]);
 
+  // Production always uses the approved style; Pace Debug switches it in development.
+  const style = useSyncExternalStore(errorStyle.subscribe,
+    process.env.NODE_ENV === "development" ? errorStyle.get : approvedStyle, approvedStyle);
+
   // Remember where the latest mistake happened so only that letter flashes,
-  // and only until the player gets past it.
-  const [errorMark, setErrorMark] = useState({ count: errorCount, index: -1 });
+  // and only until the player gets past it. `missed` keeps every letter that was
+  // mistyped (for the `marks` style); a new prompt remounts this component, clearing it.
+  const [errorMark, setErrorMark] = useState({ count: errorCount, index: -1, missed: [] as number[] });
   if (errorMark.count !== errorCount) {
-    setErrorMark({ count: errorCount, index: errorCount > errorMark.count ? currentIndex : -1 });
+    const increased = errorCount > errorMark.count;
+    setErrorMark({
+      count: errorCount,
+      index: increased ? currentIndex : -1,
+      missed: !increased ? [] : errorMark.missed.includes(currentIndex)
+        ? errorMark.missed : [...errorMark.missed, currentIndex],
+    });
   }
   const erroredHere = errorMark.index === currentIndex;
 
@@ -187,6 +201,7 @@ export function TypingText({ text, currentIndex, errorCount, status, intensity, 
     <p
       ref={containerRef}
       aria-label={text}
+      data-error-style={style}
       className={`typing-text relative whitespace-pre-wrap ${finished ? "text-exit" : ""} ${className ?? ""}`}
       style={{ "--caret-glow": intensity.toFixed(3) } as CSSProperties}
     >
@@ -199,23 +214,29 @@ export function TypingText({ text, currentIndex, errorCount, status, intensity, 
           );
         }
 
+        // The `word` error style washes the whole current word; keyed so each mistake replays.
+        const wordError = style === "word" && erroredHere
+          && currentIndex >= token.start && currentIndex < token.start + token.chars.length;
+
         return (
           <span
             key={token.start}
             aria-hidden
-            className="word-enter inline-block whitespace-nowrap"
+            className="word-enter relative inline-block whitespace-nowrap"
             style={{ animationDelay: `${token.order * 22}ms` }}
           >
+            {wordError && <span key={errorCount} className="word-error" />}
             {Array.from(token.chars, (char, offset) => {
               const index = token.start + offset;
               const state = index < currentIndex ? "char-typed" : "char-pending";
               const flash = index === currentIndex && erroredHere;
+              const missed = style === "marks" && errorMark.missed.includes(index);
 
               return (
                 <span
                   key={flash ? `${index}:${errorCount}` : index}
                   data-i={index}
-                  className={`char inline-block ${state} ${flash ? "char-error" : ""}`}
+                  className={`char relative inline-block ${state} ${flash ? "char-error" : ""} ${missed ? "char-missed" : ""}`}
                 >
                   {char}
                 </span>
@@ -232,7 +253,7 @@ export function TypingText({ text, currentIndex, errorCount, status, intensity, 
       >
         <span
           key={errorCount}
-          className={`block h-full ${erroredHere ? "caret-shake" : ""}`}
+          className={`block h-full ${erroredHere ? (style === "current" ? "caret-shake" : style === "caret" ? "caret-flare" : "caret-pulse") : ""}`}
         >
           <span
             key={`${currentIndex}:${errorCount}`}

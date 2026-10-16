@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { ERROR_STYLES, errorStyle, type ErrorStyle } from "@/components/typing/errorStyle";
 import OrbDebugger from "./OrbDebugger";
 
 /** Imported only by the development build. No typing-engine state is writable here. */
@@ -14,6 +15,7 @@ export default function WpmSimulator({ value, onChange, finished, idle, onReplay
   onReplayIntro: () => void;
 }) {
   const [wpm, setWpm] = useState(30);
+  const highlight = useSyncExternalStore(errorStyle.subscribe, errorStyle.get, errorStyle.get);
   const enabled = value !== null;
   const update = (next: number) => {
     setWpm(next);
@@ -45,6 +47,13 @@ export default function WpmSimulator({ value, onChange, finished, idle, onReplay
         {finished && <p className="mt-2">Simulation pauses during results.</p>}
         <button type="button" disabled={!idle} onClick={onReplayIntro}
           className="mt-3 w-full rounded border border-neutral-200 py-1 disabled:opacity-40">Replay intro</button>
+        <label className="mt-3 flex items-center justify-between gap-2">
+          Error highlight
+          <select value={highlight} onChange={event => errorStyle.set(event.target.value as ErrorStyle)}
+            className="rounded border border-neutral-200 bg-white px-1 py-0.5">
+            {ERROR_STYLES.map(style => <option key={style} value={style}>{style}</option>)}
+          </select>
+        </label>
         <OrbDebugger />
       </details>
     </aside>
