@@ -308,6 +308,30 @@ body {
   }
 }
 
+/* The intro's big bang carries across the page (GenesisStage). The UI is hidden until
+   the first arrival, then each [data-genesis-reveal] element is uncovered as the wave
+   crosses it. */
+
+[data-genesis-reveal] {
+  transition: opacity 600ms var(--ease-out);
+}
+
+html[data-genesis="waiting"] [data-genesis-reveal] {
+  opacity: 0;
+}
+
+html[data-genesis="playing"] [data-genesis-reveal] {
+  mask-image: radial-gradient(circle at var(--genesis-x, 50%) var(--genesis-y, 50%),
+    #000 calc(var(--genesis-r, 0px) - 140px), transparent var(--genesis-r, 0px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-genesis] [data-genesis-reveal] {
+    opacity: 1;
+    mask-image: none;
+  }
+}
+
 /* Gradients don't interpolate, so the miss tint is an overlay that fades out. */
 .caret-bar-error::after {
   content: "";

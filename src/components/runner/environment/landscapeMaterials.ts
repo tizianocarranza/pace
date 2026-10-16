@@ -3,14 +3,16 @@ import { landscapeFragment, landscapeVertex } from "./landscapeShaders";
 import { createLightingUniforms } from "./worldLighting";
 import { WorldInteractions } from "./worldInteractions";
 
-/** Light trails are the only transparent world surface; they draw last. */
-export const RENDER_ORDER = { light: 4 } as const;
+/** Transparent world surfaces draw last: the light trails, then the intro's big bang core. */
+export const RENDER_ORDER = { light: 4, genesis: 5 } as const;
 
 /** The pearl ground, plus the uniforms the light trails share with it. */
 export function createLandscapeMaterials(interactions = new WorldInteractions()) {
   const uniforms = {
     ...createLightingUniforms(),
     uTravel: { value: 0 }, uVisibility: { value: 1 },
+    // The intro's big bang (worldGenesis.ts); the resting value is a complete world.
+    uGenesis: { value: new THREE.Vector4(1e4, 0, -1, 0) },
     uEnergy: { value: new THREE.Vector4() }, uEnergyPhase: { value: 0 },
     uEnergyTier: { value: 0 }, uTrailTravel: { value: 0 },
     uImpulses: { value: interactions.packed }, uImpulseParameters: { value: interactions.parameters },

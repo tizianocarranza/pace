@@ -21,6 +21,9 @@ Simulated zero speed uses the regular deceleration; it does not reset world trav
 Real prompt completion takes priority, retains the normal finish/results flow,
 and temporarily suspends the simulator. Real typing still works while it is enabled.
 
+**Replay intro** (only before the first key) runs the intro again: the world fades in
+from white and Pip runs in from the left. Production always passes `introReplay={0}`.
+
 Run `node scripts/check-visual-speed.mjs`, `node scripts/check-pip-motion.mjs`
 and `node scripts/check-environment.mjs` for mapping, controller and momentum checks.
 

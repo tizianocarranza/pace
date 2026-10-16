@@ -18,9 +18,14 @@ type PipProps = {
   errorCount: number;
   status: "idle" | "running" | "finished";
   onFinishExit?: () => void;
+  /** The scene is drawn: start the intro run-in. */
+  arrive?: boolean;
+  introReplay?: number;
 };
 
-export function Pip({ intensity, sustainedInput = false, lastCorrectAt, errorCount, status, onFinishExit }: PipProps) {
+export function Pip({
+  intensity, sustainedInput = false, lastCorrectAt, errorCount, status, onFinishExit, arrive = false, introReplay = 0,
+}: PipProps) {
   const placement = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF("/models/pip.glb");
   const face = useMemo(() => createPipFace(), []);
@@ -28,6 +33,7 @@ export function Pip({ intensity, sustainedInput = false, lastCorrectAt, errorCou
   usePipReflection(scene);
   const motion = usePipMotion(
     scene, placement, animations, intensity, lastCorrectAt, errorCount, status, onFinishExit, sustainedInput, face,
+    arrive, introReplay,
   );
 
   return (

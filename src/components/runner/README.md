@@ -1,5 +1,20 @@
 # Pip motion
 
+**Intro.** The whole scene suspends on Pip's GLB. `SceneReady` (last child of the
+Canvas, so it mounts with everything else) runs `gl.compileAsync`, waits two frames and
+flips `ready`. Then `PipMotion.beginArrival` plays the intro. First the world is born
+(the big bang, see [environment](environment/README.md)) while Pip waits off-screen for
+`ARRIVAL_DELAY` (0.95 s), standing, so the world does not travel. Then the mirror of the
+finish exit: Pip starts mid-stride just outside the left frustum plane, runs in at the exit's
+speed (`clamp(viewportWidth · 0.6, 7.5, 22)`) and brakes to center on a 0.8 s easeOutCubic,
+settling with a hop and a blink. Position is analytic in time, so it lands at the same
+moment at any frame rate and never overshoots; the whole intro takes ~2.4 s on a phone and
+~3 s on a wide screen. Its speed (1 while running in, `remaining²` while braking) feeds the
+usual target, so cadence, lean, footsteps and facing come from the normal controller. Each
+arrival bumps `arrivalSequence`; the world consumes it once and plays the big bang.
+`autoArrive` replays it on every reset (Try again). Typing during the intro just blends in.
+Reduced motion keeps Pip at center, with no burst; the world only fades in from white.
+
 Visual speed is resolved once in `src/lib/visualSpeed.ts`: real WPM or the
 development simulator feeds one nonlinear 0–90 WPM intensity curve. See the
 [WPM simulator](../debug/README.md) for controls and pipeline boundaries.

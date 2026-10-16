@@ -63,10 +63,13 @@ try {
   };
   await call('Page.navigate', { url: 'http://localhost:3000/' });
   for (let i = 0; i < 100; i++) {
-    if (await evaluate(`!!window.__paceReview?.scene.getObjectByName('PipBody') && !!document.querySelector('aside summary')`)) break;
+    // The canvas fades in once the scene has drawn (Runner's SceneReady); wait it out.
+    if (await evaluate(`!!window.__paceReview?.scene.getObjectByName('PipBody') && !!document.querySelector('aside summary') && getComputedStyle(document.querySelector('canvas').closest('.fixed')).opacity==='1'`)) break;
     await sleep(150);
   }
   await sleep(500);
+  // The clock is stepped, so play the intro (big bang, then Pip running in: ~3.1 s) first.
+  await advance(240);
   const prefix = mobile ? 'mobile' : 'desktop';
   await shot(`${prefix}-idle`);
   await evaluate(`const box=document.querySelector('aside input[type=checkbox]');box.closest('aside').querySelector('details').open=true;box.click();Array.from(box.closest('aside').querySelectorAll('button')).find(b=>b.textContent==='${simulatedWpm}').click();document.querySelectorAll('aside').forEach(a=>a.style.visibility='hidden');`);

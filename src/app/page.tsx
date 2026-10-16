@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useTypingEngine } from "@/hooks/useTypingEngine";
 import { Results } from "@/components/results/Results";
 import { Runner } from "@/components/runner/Runner";
+import { GenesisStage } from "@/components/runner/GenesisStage";
 import { TypingText } from "@/components/typing/TypingText";
 import { WpmCounter } from "@/components/typing/WpmCounter";
 import { getRandomPrompt, PROMPTS } from "@/data/prompts";
@@ -16,6 +17,7 @@ export default function Home() {
   const [text, setText] = useState<string>(PROMPTS[0]);
   const [showResults, setShowResults] = useState(false);
   const [simulatedWpm, setSimulatedWpm] = useState<number | null>(null);
+  const [introReplay, setIntroReplay] = useState(0);
 
   const {
     currentIndex,
@@ -53,7 +55,8 @@ export default function Home() {
 
   return (
     <main className="isolate grid min-h-screen grid-rows-[auto_1fr_1fr] bg-white px-12 py-8 text-[#3d3a55] max-sm:px-6 max-sm:py-6">
-      <header className="flex items-center justify-between">
+      <GenesisStage />
+      <header data-genesis-reveal className="flex items-center justify-between">
         <span className="text-base font-medium tracking-[-0.04em]">pace.</span>
         <a
           href="https://github.com/tizianocarranza"
@@ -65,7 +68,7 @@ export default function Home() {
         </a>
       </header>
 
-      <section className="flex items-center justify-center">
+      <section data-genesis-reveal className="flex items-center justify-center">
         {!showResults ? (
           <TypingText
             key={text}
@@ -89,20 +92,24 @@ export default function Home() {
           errorCount={errorCount}
           status={visualSpeed.status}
           onFinishExit={() => setShowResults(true)}
+          introReplay={process.env.NODE_ENV === "development" ? introReplay : 0}
           className="h-48 w-screen"
         />
 
         {status !== "finished" && (
-          <WpmCounter
-            wpm={currentWpm}
-            intensity={visualSpeed.intensity}
-            className={`transition-opacity duration-500 ${status === "idle" ? "opacity-40" : "opacity-100"}`}
-          />
+          <div data-genesis-reveal>
+            <WpmCounter
+              wpm={currentWpm}
+              intensity={visualSpeed.intensity}
+              className={`transition-opacity duration-500 ${status === "idle" ? "opacity-40" : "opacity-100"}`}
+            />
+          </div>
         )}
       </section>
       {WpmSimulator && (
         <Suspense fallback={null}>
-          <WpmSimulator value={simulatedWpm} onChange={setSimulatedWpm} finished={status === "finished"} />
+          <WpmSimulator value={simulatedWpm} onChange={setSimulatedWpm} finished={status === "finished"}
+            idle={status === "idle"} onReplayIntro={() => setIntroReplay(n => n + 1)} />
         </Suspense>
       )}
     </main>

@@ -11,6 +11,12 @@ import { updateLightingUniforms, type createLightingUniforms } from "./worldLigh
 import { WorldInteractions } from "./worldInteractions";
 import { WorldEnergy } from "./worldEnergy";
 import { LightTrails } from "./LightTrails";
+import { GenesisCore } from "./GenesisCore";
+import { WorldGenesis } from "./worldGenesis";
+import { genesisStage } from "./genesisStage";
+
+/** The big bang's core (Pip's spot, body height), projected for the page each frame. */
+const genesisCore = new THREE.Vector3();
 import { worldTone } from "./worldTone";
 
 /** A fixed window into a continuous landscape, independent of Pip's placement. */
@@ -19,6 +25,7 @@ export function ReactiveEnvironment({ motion, status }: {
   status: PipStatus;
 }) {
   const energy = useMemo(() => new WorldEnergy(), []);
+  const genesis = useMemo(() => new WorldGenesis(), []);
   const controller = useRef<LandscapeMotion | null>(null);
   const terrain = useMemo(() => createTerrain(), []);
   const interactions = useMemo(() => new WorldInteractions(), []);
@@ -29,11 +36,21 @@ export function ReactiveEnvironment({ motion, status }: {
   useEffect(() => () => Object.values(surfaces).forEach(surface => surface.dispose()), [surfaces]);
   // The world is gone: its warmth no longer applies to the orb.
   useEffect(() => () => worldTone.publish(0), []);
-  useFrame(({ size, gl }, delta) => {
+  useFrame(({ size, gl, camera }, delta) => {
     const world = controller.current ?? (controller.current = new LandscapeMotion());
     world.update(delta, motion.current, status);
     interactions.update(delta, motion.current, world, status);
     energy.update(delta, motion.current, world, status);
+    genesis.update(delta, motion.current, status);
+    // The page expands with the ground: same clock and curve, centered on the core on
+    // screen (the canvas fills the viewport), reaching its farthest corner as the ground
+    // reaches its edges (progress ≈ 0.75).
+    genesisCore.set(0, 0.45, 0).project(camera);
+    const x = (genesisCore.x * 0.5 + 0.5) * size.width;
+    const y = (0.5 - genesisCore.y * 0.5) * size.height;
+    const reach = Math.max(Math.hypot(x, y), Math.hypot(size.width - x, y),
+      Math.hypot(x, size.height - y), Math.hypot(size.width - x, size.height - y));
+    genesisStage.publish(genesis.arrivals, genesis.expanding, x, y, genesis.progress * reach / 0.75);
     if (liveUniforms.current) {
       const live = liveUniforms.current;
       live.uTravel.value = world.travel;
@@ -42,6 +59,7 @@ export function ReactiveEnvironment({ motion, status }: {
       live.uEnergyPhase.value = energy.phase;
       live.uEnergyTier.value = energy.tier;
       live.uTrailTravel.value = energy.trailDistance;
+      live.uGenesis.value.copy(genesis.value);
       worldTone.publish(energy.value.y);
       updateLightingUniforms(live as ReturnType<typeof createLightingUniforms>, world);
       const dpr = gl.getPixelRatio();
@@ -61,6 +79,7 @@ export function ReactiveEnvironment({ motion, status }: {
         <primitive object={surfaces.terrain} attach="material" />
       </mesh>
       <LightTrails surfaces={surfaces} />
+      <GenesisCore surfaces={surfaces} genesis={genesis} />
     </group>
   );
 }

@@ -14,6 +14,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      // The intro reveals the UI (GenesisStage); hidden from the first paint, no flash.
+      data-genesis="waiting"
       className={`${instrumentSans.className} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
