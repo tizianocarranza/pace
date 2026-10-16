@@ -3,6 +3,7 @@ import { interactionField } from "./worldInteractions";
 import { energyField } from "./worldEnergy";
 import { atmosphereField } from "./atmosphere";
 import { floorWarmthField } from "./floorWarmth";
+import { genesisField } from "./worldGenesis";
 
 export const landscapeVertex = /* glsl */ `
   uniform float uTravel;
@@ -10,12 +11,15 @@ export const landscapeVertex = /* glsl */ `
   varying vec3 vNormal;
   ${terrainField}
   ${interactionField}
+  ${genesisField}
   void main() {
     vec3 p = position;
     vec2 at = p.xz + vec2(uTravel, 0.0);
     p.y = terrainHeight(at);
     vec3 pressure = contactPressure(p.xz);
     p.y += pressure.x;
+    // The big bang's wave front swells the ground as it passes, then it settles.
+    p.y += genesisFront(p) * 0.35;
     float dx = terrainHeight(at + vec2(0.04, 0.0)) - terrainHeight(at - vec2(0.04, 0.0));
     float dz = terrainHeight(at + vec2(0.0, 0.04)) - terrainHeight(at - vec2(0.0, 0.04));
     vec3 n = normalize(vec3(-dx - pressure.y * 0.08, 0.08, -dz - pressure.z * 0.08));
@@ -31,6 +35,7 @@ export const landscapeFragment = /* glsl */ `
   uniform vec3 uPearl;
   uniform vec3 uBlue;
   uniform vec3 uViolet;
+  uniform vec3 uWarm;
   uniform vec3 uKeyDirection;
   uniform vec3 uWarmDirection;
   uniform vec3 uCoolDirection;
@@ -47,6 +52,7 @@ export const landscapeFragment = /* glsl */ `
   ${energyField}
   ${floorWarmthField}
   ${atmosphereField}
+  ${genesisField}
 
   // Broad reflection lobes use the shared world light directions. No scene capture.
   float studioCard(vec3 reflection, vec3 direction, float spread) {
@@ -66,7 +72,7 @@ export const landscapeFragment = /* glsl */ `
     // forms reach higher. This is a composition mask, not a character halo.
     float sentenceColumn = 1.0 - smoothstep(0.22, 0.38, abs(screen.x - 0.5));
     frame *= 1.0 - sentenceColumn * smoothstep(0.60, 0.66, screen.y);
-    return (1.0 - nearFade) * (1.0 - farFade) * (1.0 - edge) * frame * uVisibility;
+    return (1.0 - nearFade) * (1.0 - farFade) * (1.0 - edge) * frame * uVisibility * genesisReveal(vWorld);
   }
   void main() {
     vec3 view = normalize(cameraPosition - vWorld);
@@ -141,6 +147,14 @@ export const landscapeFragment = /* glsl */ `
     color = floorWarmth(color, vWorld);
     vec3 air = mix(uCoolLight, vec3(1.0), 0.88);
     color = mix(color, air, distanceHaze(vWorld));
+    // The big bang's wave front, lit like its core (genesisShaders.ts): a lavender haze,
+    // a pale peach band inside it and a near-white hot line at the crest.
+    float front = genesisFront(vWorld);
+    if (front > 0.0) {
+      color = mix(color, mix(uViolet, uPearl, 0.3), min(0.8, front));
+      color = mix(color, mix(uWarm, uPearl, 0.5), front * front * 0.9);
+      color = mix(color, vec3(1.0), pow(front, 6.0));
+    }
     gl_FragColor = vec4(color, 1.0);
     #include <tonemapping_fragment>
     gl_FragColor.rgb = mix(vec3(1.0), gl_FragColor.rgb, surfacePresence());

@@ -11,6 +11,10 @@ export type PipMotionSignals = {
   stumble: number;
   stumbleSequence: number;
   active: boolean;
+  /** True while Pip runs in from the left (the intro); the world travels with it. */
+  arriving: boolean;
+  /** Increments when an arrival starts; the world consumes each one once. */
+  arrivalSequence: number;
   reducedMotion: boolean;
   contacts: PipContacts;
 };
@@ -44,12 +48,19 @@ const BLINK_CLOSING = 0.4;
 // The Body bone's local axes equal Blender's (see assets/pip/build_animated.py):
 // +Z up, -Y forward. Lean already rotates about X.
 const BODY_UP_AXIS = 2;
+/** The intro run-in brakes to center over this long (s), after running in at exit speed. */
+const ARRIVAL_BRAKE = 0.8;
+/** Pip waits off-screen while the world is born (the big bang in worldGenesis.ts bursts
+ * at 0.45 s); the run starts as the wave front sweeps past the frame. */
+export const ARRIVAL_DELAY = 0.95;
+/** How far outside the left frustum plane the arrival starts (the exit's margin, plus room). */
+const ARRIVAL_MARGIN = 2.2;
 
 /** Owns visual motion only. Scoring and the typing engine never depend on it. */
 export class PipMotion {
   readonly signals: PipMotionSignals = {
     intent: 0, speed: 0, acceleration: 0, locomotion: 0, stumble: 0, stumbleSequence: 0,
-    active: false, reducedMotion: false, contacts: createContacts(),
+    active: false, arriving: false, arrivalSequence: 0, reducedMotion: false, contacts: createContacts(),
   };
   private readonly mixer: THREE.AnimationMixer;
   private readonly idle: THREE.AnimationAction;
@@ -81,6 +92,15 @@ export class PipMotion {
   private finishCycles = 0;
   private exitVelocity = 0;
   private exited = false;
+  /** Set by the app: every reset (Try again) replays the arrival. Off in headless checks. */
+  autoArrive = false;
+  private arrivalTime = 0;
+  private arrivalSpeed = 0;
+  private arrivalCruise = 0;
+  private arrivalBrake = 0;
+  private arrivalBrakeDistance = 0;
+  private arrivalPending = false;
+  private readonly leftFrustumPlane = new THREE.Plane();
 
   constructor(
     private readonly model: THREE.Group,
@@ -136,6 +156,22 @@ export class PipMotion {
     this.placement.rotation.set(0, 0, 0);
     this.placement.visible = true;
     resetContacts(this.signals.contacts);
+    this.signals.arriving = false;
+    this.arrivalPending = false;
+    if (this.autoArrive) this.beginArrival();
+  }
+
+  /** Starts the intro: Pip runs in from off-screen left and settles at center. With
+   * reduced motion Pip stays put; only the world fades in. */
+  beginArrival() {
+    const motion = this.signals;
+    motion.arrivalSequence++;
+    if (motion.reducedMotion) return;
+    motion.arriving = true;
+    this.arrivalTime = -ARRIVAL_DELAY;
+    // The start x needs the camera, so it is resolved on the next update.
+    this.arrivalPending = true;
+    this.placement.visible = true;
   }
 
   /** Returns true once, only when the complete silhouette has left the camera. */
@@ -173,6 +209,55 @@ export class PipMotion {
     this.previousStatus = status;
     if (this.exited) return false;
 
+    // The mirror of the exit: Pip runs in at the exit's speed, then brakes on an ease-out.
+    // Position is analytic in time, so it lands at the same moment at any frame rate.
+    let arrival = 0;
+    if (motion.arriving && (status === "finished" || motion.reducedMotion)) {
+      motion.arriving = false;
+      this.placement.position.x = 0;
+    }
+    if (motion.arriving) {
+      if (this.arrivalPending) {
+        this.viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        const e = this.viewProjection.elements;
+        const plane = this.leftFrustumPlane.setComponents(
+          e[3] + e[0], e[7] + e[4], e[11] + e[8], e[15] + e[12],
+        ).normalize();
+        const distance = Math.max(0, (ARRIVAL_MARGIN + plane.constant) / plane.normal.x);
+        this.arrivalSpeed = THREE.MathUtils.clamp(viewportWidth * 0.60, 7.5, 22);
+        // An easeOutCubic over B seconds starting at speed v covers v·B/3.
+        this.arrivalBrakeDistance = Math.min(distance, this.arrivalSpeed * ARRIVAL_BRAKE / 3);
+        this.arrivalBrake = 3 * this.arrivalBrakeDistance / this.arrivalSpeed;
+        this.arrivalCruise = (distance - this.arrivalBrakeDistance) / this.arrivalSpeed;
+        this.arrivalPending = false;
+      }
+      const waited = this.arrivalTime < 0;
+      this.arrivalTime += dt;
+      if (waited && this.arrivalTime >= 0) {
+        // Off-screen, so the jump is unseen: already mid-stride and facing the run.
+        motion.speed = 1;
+        this.cadence = 0.62 + 1.18 + 0.24;
+        this.placement.rotation.y = Math.PI / 3;
+      }
+      const braking = Math.max(0, this.arrivalTime) - this.arrivalCruise;
+      let remaining = 1;
+      if (braking < 0) {
+        this.placement.position.x = -this.arrivalBrakeDistance + braking * this.arrivalSpeed;
+      } else {
+        remaining = this.arrivalBrake > 0 ? 1 - Math.min(1, braking / this.arrivalBrake) : 0;
+        this.placement.position.x = -this.arrivalBrakeDistance * remaining ** 3;
+      }
+      // While waiting, Pip stands still off-screen and the world does not travel.
+      arrival = this.arrivalTime < 0 ? 0 : remaining * remaining;
+      if (remaining === 0) {
+        motion.arriving = false;
+        this.placement.position.x = 0;
+        // Settles with a small hop and a blink, like the start of a run.
+        this.bounce.velocity += 0.9 * reduced;
+        this.blinkTime = 0;
+      }
+    }
+
     if (errors > this.previousErrors && status !== "finished") {
       if (!this.stumbling) {
         motion.stumbleSequence++;
@@ -202,9 +287,9 @@ export class PipMotion {
     // WPM remains a four-second statistic. Visual intent starts coasting sooner.
     const intent = input * Math.exp(-Math.max(0, age - grace) * 3.2);
     // Environment momentum consumes typing intent before the character-only stumble response.
-    motion.intent = status === "finished" ? 1 : status === "idle" ? 0 : intent;
-    const target = status === "finished" ? 1 : status === "idle" ? 0
-      : intent * (1 - stumbleEnvelope * 0.55);
+    motion.intent = status === "finished" ? 1 : Math.max(arrival, status === "idle" ? 0 : intent);
+    const target = status === "finished" ? 1 : Math.max(arrival, status === "idle" ? 0
+      : intent * (1 - stumbleEnvelope * 0.55));
     const previousSpeed = motion.speed;
     motion.speed = THREE.MathUtils.damp(motion.speed, target,
       target > motion.speed ? 5.5 : this.stumbling ? 7 : 3.2, dt);
@@ -212,7 +297,7 @@ export class PipMotion {
       motion.acceleration, (motion.speed - previousSpeed) / dt, 7, dt,
     );
     motion.locomotion = THREE.MathUtils.smoothstep(motion.speed, 0.003, 0.15);
-    motion.active = status !== "idle" || this.stumbling;
+    motion.active = status !== "idle" || this.stumbling || motion.arriving;
 
     const sprint = THREE.MathUtils.smoothstep(motion.speed, 0.55, 1);
     const stride = 0.62 + 1.18 * Math.sqrt(motion.speed) + sprint * 0.24;

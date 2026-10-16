@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { type RefObject, useLayoutEffect, useRef } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { type PipFace } from "./pipFace";
 import { PipMotion, type PipMotionSignals, type PipStatus } from "./pipMotion";
@@ -19,6 +19,8 @@ export function usePipMotion(
   onFinishExit?: () => void,
   sustainedInput = false,
   face?: PipFace,
+  arrive = false,
+  introReplay = 0,
 ) {
   const controller = useRef<PipMotion | null>(null);
   const signals = useRef<PipMotionSignals | null>(null);
@@ -39,6 +41,21 @@ export function usePipMotion(
       signals.current = null;
     };
   }, [model, placement, clips, face]);
+
+  // The intro starts once the scene is drawn; from then on every reset (Try again) replays it.
+  useEffect(() => {
+    const motion = controller.current;
+    if (!arrive || !motion) return;
+    motion.autoArrive = true;
+    motion.beginArrival();
+  }, [arrive, model, placement, clips, face]);
+
+  // Development replay from the debug panel; only from rest, never mid-run.
+  const replayStatus = useRef(status);
+  useLayoutEffect(() => { replayStatus.current = status; }, [status]);
+  useEffect(() => {
+    if (introReplay > 0 && replayStatus.current === "idle") controller.current?.beginArrival();
+  }, [introReplay]);
 
   // Explicit order: animation/pose -> sole samples -> shadow and environment.
   // Negative priority preserves R3F's automatic rendering.

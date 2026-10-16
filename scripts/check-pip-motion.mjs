@@ -20,7 +20,7 @@ for (const name of ['pipContacts', 'pipFace', 'pipMotion', 'worldInteractions', 
     .replace('"./pipContacts"', '"./pipContacts.mjs"').replace('"../pipContacts"', '"./pipContacts.mjs"')
     .replace('"./pipFace"', '"./pipFace.mjs"'));
 }
-const { PipMotion } = await import(pathToFileURL(path.join(compiled, 'pipMotion.mjs')));
+const { PipMotion, ARRIVAL_DELAY } = await import(pathToFileURL(path.join(compiled, 'pipMotion.mjs')));
 const { PIP_SOLE_Y } = await import(pathToFileURL(path.join(compiled, 'pipContacts.mjs')));
 const { frameComposition } = await import(pathToFileURL(path.join(compiled, 'composition.mjs')));
 const { WorldInteractions, IMPULSE_CAPACITY } = await import(pathToFileURL(path.join(compiled, 'worldInteractions.mjs')));
@@ -267,3 +267,64 @@ assert(Math.max(...firstBlinks) - Math.min(...firstBlinks) < 0.05, `blink timing
   f.motion.dispose();
 }
 console.log('Face passed: deterministic blinks at 30/60/120 Hz, squint at speed, squeeze on stumble, wide finish, reset and reduced motion.');
+
+// Intro: Pip runs in from beyond the left edge at the exit's speed and brakes to center,
+// never overshooting, landing at the same time at any frame rate. Try again replays it.
+const arrivalTimes = [];
+for (const [width, height] of [[390, 844], [1536, 1024], [2560, 1080]]) {
+  const landings = [];
+  for (const fps of [30, 60, 120]) {
+    const f = fixture(width / height);
+    frameComposition(f.camera, width, height); f.camera.updateMatrixWorld();
+    f.motion.autoArrive = true;
+    f.motion.beginArrival();
+    assert.equal(f.motion.signals.arrivalSequence, 1);
+    f.tick(1 / fps, 0, 'idle', false);
+    const rightEdge = new THREE.Vector3(f.placement.position.x + 1.65, 0, 0).project(f.camera);
+    assert(rightEdge.x < -1, `arrival starts with the silhouette off-screen left at ${width}x${height}`);
+    // Pip waits off-screen, standing, while the world is born; the world does not travel.
+    const waitingX = f.placement.position.x;
+    let frames = 1;
+    while (frames < Math.round(ARRIVAL_DELAY * fps) - 1) {
+      f.tick(1 / fps, 0, 'idle', false);
+      frames++;
+      assert(f.placement.position.x === waitingX && f.motion.signals.intent === 0 && f.motion.signals.arriving,
+        'waits off-screen through the big bang');
+    }
+    while (f.motion.signals.locomotion < 0.5) { f.tick(1 / fps, 0, 'idle', false); frames++; }
+    assert(f.placement.position.x < -1 && rightEdge.x < -1, 'starts running in mid-stride, still off-screen');
+    const exitSpeed = THREE.MathUtils.clamp(2 * f.camera.position.length() / f.camera.projectionMatrix.elements[0] * 0.6, 7.5, 22);
+    let previousX = f.placement.position.x;
+    while (f.motion.signals.arriving) {
+      f.tick(1 / fps, 0, 'idle', false);
+      const step = f.placement.position.x - previousX;
+      assert(step >= -1e-12 && f.placement.position.x <= 0, 'never runs backwards or past center');
+      assert(step <= exitSpeed / fps + 1e-9, 'never faster than the exit run');
+      previousX = f.placement.position.x;
+      frames++;
+      assert(frames < fps * 6, 'arrival ends');
+    }
+    assert.equal(f.placement.position.x, 0);
+    landings.push(frames / fps);
+    for (let i = 0; i < fps * 2; i++) f.tick(1 / fps, 0, 'idle', false);
+    assert(f.motion.signals.speed < 0.01 && !f.motion.signals.active, 'comes to rest after the arrival');
+    assert(Math.abs(f.placement.rotation.y) < 0.02, 'turns back toward the camera');
+    // Try again replays the arrival.
+    f.tick(1 / fps, 1, 'running');
+    f.tick(1 / fps, 0, 'idle', false);
+    assert(f.motion.signals.arrivalSequence === 2 && f.motion.signals.arriving, 'reset replays the intro');
+    f.motion.dispose();
+  }
+  assert(landings.every(t => Math.abs(t - landings[0]) < 1 / 30 + 1e-9), `arrival lands at the same time at any frame rate: ${landings}`);
+  arrivalTimes.push(`${width}x${height} ${landings[1].toFixed(2)} s`);
+}
+{
+  const f = fixture();
+  f.motion.signals.reducedMotion = true;
+  f.motion.beginArrival();
+  f.tick(1 / 60, 0, 'idle', false);
+  assert(f.motion.signals.arrivalSequence === 1 && !f.motion.signals.arriving && f.placement.position.x === 0,
+    'reduced motion: no run-in, only the world fades in');
+  f.motion.dispose();
+}
+console.log(`Intro passed: off-screen start, exit-speed run-in and monotonic settle at 30/60/120 Hz (${arrivalTimes.join(', ')}), rest, replay on reset and reduced motion.`);

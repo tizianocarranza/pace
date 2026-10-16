@@ -23,6 +23,7 @@ for (const [name, file] of [
   ['worldEnergy', 'src/components/runner/environment/worldEnergy.ts'],
   ['trailShaders', 'src/components/runner/environment/trailShaders.ts'],
   ['composition', 'src/components/runner/composition.ts'],
+  ['worldGenesis', 'src/components/runner/environment/worldGenesis.ts'],
 ]) {
   const source = await fs.readFile(file, 'utf8');
   const { outputText } = ts.transpileModule(source, {
@@ -30,7 +31,7 @@ for (const [name, file] of [
   });
   await fs.writeFile(path.join(compiled, `${name}.mjs`), outputText
     .replace('"../pipContacts"', '"./pipContacts.mjs"')
-    .replace(/"\.\/(landscape|landscapeShaders|worldLighting|terrainProfile|worldMotion|worldInteractions|worldEnergy|atmosphere|floorWarmth)"/g, '"./$1.mjs"'));
+    .replace(/"\.\/(landscape|landscapeShaders|worldLighting|terrainProfile|worldMotion|worldInteractions|worldEnergy|atmosphere|floorWarmth|worldGenesis)"/g, '"./$1.mjs"'));
 }
 const { LandscapeMotion, WORLD_PERIOD, GROUND_Y, terrainHeight, createTerrain } =
   await import(pathToFileURL(path.join(compiled, 'landscape.mjs')));
@@ -96,11 +97,122 @@ const frozenLag = world.lag, frozenIntensity = world.intensity;
 for (let i = 0; i < 120; i++) world.update(1 / 60, { ...motion, reducedMotion: true }, 'running');
 assert.equal(world.travel, paused, 'reduced motion freezes environmental travel immediately');
 assert.equal(world.lag, frozenLag); assert.equal(world.intensity, frozenIntensity);
-for (let i = 0; i < 240; i++) world.update(1 / 60, { ...motion, active: false }, 'finished');
-assert(world.visibility < 0.001, 'results clear the world after Pip exits');
+for (let i = 0; i < 60; i++) world.update(1 / 60, { ...motion, active: false }, 'finished');
+assert.equal(world.visibility, 1, 'after the exit the big bang collapses the world; no global fade');
+for (let i = 0; i < 240; i++) world.update(1 / 60, { ...motion, active: false, reducedMotion: true }, 'finished');
+assert(world.visibility < 0.001, 'reduced motion: results clear the world with a fade');
 world.update(1 / 60, motion, 'idle');
 assert.equal(world.travel, 0); assert.equal(world.velocity, 0); assert.equal(world.visibility, 1);
 world.update(NaN, null, 'idle'); assert(Number.isFinite(world.travel));
+
+// Intro: the world travels with Pip's run-in in idle. The big bang reveals it, so it is
+// never globally faded, except under reduced motion, where it fades in from white instead.
+{
+  const intro = new LandscapeMotion();
+  const arriving = { speed: 1, intent: 1, active: true, arriving: true, arrivalSequence: 1, reducedMotion: false };
+  intro.update(1 / 60, arriving, 'idle');
+  assert(intro.visibility === 1 && intro.travel > 0, 'an arrival travels in idle; the big bang reveals the world');
+  const reduced = new LandscapeMotion();
+  reduced.update(1 / 60, { ...arriving, reducedMotion: true }, 'idle');
+  assert(reduced.visibility < 0.1, 'reduced motion: the world fades in from white');
+  for (let i = 0; i < 120; i++) reduced.update(1 / 60, { ...arriving, reducedMotion: true }, 'idle');
+  assert(reduced.visibility > 0.99);
+  for (let i = 0; i < 120; i++) intro.update(1 / 60, arriving, 'idle');
+  const settled = { ...arriving, speed: 0, intent: 0, active: false, arriving: false };
+  for (let i = 0; i < 480; i++) intro.update(1 / 60, settled, 'idle');
+  const rest = intro.travel;
+  intro.update(1 / 60, settled, 'idle');
+  assert(intro.visibility > 0.99 && Math.abs(intro.travel - rest) < 1e-6, 'one arrival is consumed once, then the world rests');
+}
+
+// Big bang: a singularity, then a wave front that reveals every visible ground point,
+// identical at any frame rate, played once per arrival and skipped under reduced motion.
+{
+  const { WorldGenesis, GENESIS_BANG, GENESIS_RADIUS, GENESIS_SETTLE, GENESIS_EXPANSION } =
+    await import(pathToFileURL(path.join(compiled, 'worldGenesis.mjs')));
+  const idle = new WorldGenesis();
+  idle.update(1 / 60, { arrivalSequence: 0, reducedMotion: false });
+  assert(!idle.active && idle.value.x > 1000 && idle.progress === 1 && idle.arrivals === 0, 'without an arrival the world is complete');
+  const traces = [];
+  for (const fps of [30, 60, 120]) {
+    const genesis = new WorldGenesis();
+    const motion = { arrivalSequence: 1, reducedMotion: false };
+    const trace = [];
+    let t = 0;
+    let previousRadius = 0;
+    while (t < GENESIS_BANG + GENESIS_SETTLE + 0.5) {
+      genesis.update(1 / fps, motion);
+      t += 1 / fps;
+      const [radius, core, sinceBang, front] = genesis.value.toArray();
+      if (t < GENESIS_BANG - 1e-9) {
+        assert(genesis.active && radius === 0 && sinceBang < 0 && genesis.progress === 0, 'the singularity comes before the world');
+      } else if (genesis.active) {
+        assert(radius >= previousRadius && radius < GENESIS_RADIUS && front <= 1 && core >= 0, 'the front only expands');
+        assert(Math.abs(genesis.progress * GENESIS_RADIUS - radius) < 1e-9, 'the page expands on the same curve as the ground');
+        previousRadius = radius;
+      }
+      for (const sample of [0.1, 0.3, GENESIS_BANG + 0.2, GENESIS_BANG + 1.2]) {
+        if (Math.abs(t - sample) < 0.5 / fps) trace.push([radius, core, front]);
+      }
+    }
+    assert(!genesis.active && genesis.value.x > 1000 && genesis.value.w === 0, 'the intro ends with a complete world');
+    traces.push(trace.flat());
+  }
+  assert(traces.every(trace => trace.every((v, i) => Math.abs(v - traces[1][i]) < 0.08 * Math.max(1, Math.abs(traces[1][i])))),
+    'the big bang plays the same at 30/60/120 Hz');
+  // The visible ground ends where surfacePresence crops it (|x| ≤ 35, z ≥ −37).
+  const settledRadius = GENESIS_RADIUS * (1 - Math.exp(-(GENESIS_SETTLE - 0.05) / GENESIS_EXPANSION));
+  assert(settledRadius - (1.5 + 0.12 * settledRadius) > Math.hypot(35, 37), 'the front has passed every visible point before it ends');
+  const once = new WorldGenesis();
+  const motion = { arrivalSequence: 1, reducedMotion: false };
+  for (let i = 0; i < 60 * 4; i++) once.update(1 / 60, motion);
+  once.update(1 / 60, motion);
+  assert(!once.active, 'an arrival plays the big bang once');
+  motion.arrivalSequence = 2;
+  once.update(1 / 60, motion);
+  assert(once.active && once.value.x === 0, 'the next arrival (Try again) plays it again');
+  const calm = new WorldGenesis();
+  calm.update(1 / 60, { arrivalSequence: 1, reducedMotion: true });
+  assert(!calm.active && calm.value.x > 1000 && calm.progress === 1, 'reduced motion: no burst, a complete world');
+  assert.equal(calm.arrivals, 1, 'a skipped arrival still counts, so the page shows its UI');
+  assert.equal(once.arrivals, 2);
+}
+// Collapse: once Pip has exited, the world falls back into the core and stays empty
+// until the next arrival; the page is not touched. Same at any frame rate.
+{
+  const { WorldGenesis, GENESIS_COLLAPSE } = await import(pathToFileURL(path.join(compiled, 'worldGenesis.mjs')));
+  const ends = [];
+  for (const fps of [30, 60, 120]) {
+    const genesis = new WorldGenesis();
+    const running = { arrivalSequence: 0, reducedMotion: false, active: true };
+    for (let i = 0; i < fps; i++) genesis.update(1 / fps, running, 'finished');
+    assert(!genesis.active && genesis.value.x > 1000, 'the world stays while Pip is still running off');
+    const exited = { ...running, active: false };
+    let previous = Infinity, t = 0, flare = 0;
+    while (genesis.active || t === 0) {
+      genesis.update(1 / fps, exited, 'finished');
+      t += 1 / fps;
+      if (!genesis.active) break;
+      assert(!genesis.expanding, 'the collapse leaves the page alone');
+      assert(genesis.value.x <= previous + 1e-9, 'the world only falls inward');
+      previous = genesis.value.x;
+      flare = Math.max(flare, genesis.value.y);
+      assert(t < 3, 'the collapse ends');
+    }
+    assert(t > GENESIS_COLLAPSE && flare > 1, 'the core flares once the world has fallen into it');
+    assert(genesis.value.x === 0 && genesis.value.y === 0, 'collapsed: an empty page behind the results');
+    for (let i = 0; i < fps; i++) genesis.update(1 / fps, exited, 'finished');
+    assert(!genesis.active && genesis.value.x === 0, 'it stays collapsed');
+    genesis.update(1 / fps, { ...exited, arrivalSequence: 1 }, 'idle');
+    assert(genesis.active && genesis.expanding && genesis.value.x === 0, 'Try again is born again from the core');
+    ends.push(t);
+  }
+  assert(ends.every(t => Math.abs(t - ends[1]) < 1 / 30 + 1e-9), `the collapse lasts the same at any frame rate: ${ends}`);
+  const calm = new WorldGenesis();
+  calm.update(1 / 60, { arrivalSequence: 0, reducedMotion: true, active: false }, 'finished');
+  assert(!calm.active && calm.value.x > 1000, 'reduced motion: no collapse (the world fades instead)');
+}
+console.log('Big bang passed: singularity, monotonic reveal past the visible ground, collapse after the exit, 30/60/120 Hz, once per arrival, replay and reduced motion.');
 
 // Verify the player-facing momentum envelope, not just constant-speed integration.
 const envelopes = [];

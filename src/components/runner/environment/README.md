@@ -71,8 +71,36 @@ was deleted in the unused-layer clean up (see "History" below).
   WPM orb (`src/components/typing/WpmCounter.tsx`) mixes its colors toward
   `FLOOR_WARMTH.grade` by that value, so the orb and the floor warm and cool
   together. Publishing only wakes the orb when the value changes; no allocation.
+- **Big bang (intro).** Each arrival (`PipMotion.arrivalSequence`, consumed once by
+  `WorldGenesis` in `worldGenesis.ts`) plays the world's birth. A point of light grows
+  where Pip will stand for 0.45 s (`GENESIS_BANG`), then flares and is spent. `GenesisCore`
+  (`genesisShaders.ts`) draws it as one point with normal blending (light on a white page
+  has to be color), only while the intro plays. The ground is revealed by a circle growing from Pip's spot,
+  `r = 70·(1 − e^(−t/0.9))`, through `genesisReveal()` in `surfacePresence`. Its front
+  (`genesisFront()`) is lit like the core (lavender haze, pale peach band, near-white crest);
+  it swells the terrain by up to 0.35 and
+  fades over ~1.2 s. Everything is a function of elapsed time, so it plays the same at any
+  frame rate; after 2 s it rests at a complete world (`uGenesis` = (1e4, 0, −1, 0)).
+  At the finish, once Pip has run off the frame, it plays in reverse
+  (`WorldGenesis.collapse`): the edge falls inward from the visible boundary (radius 42)
+  to the core over 0.9 s, accelerating, with its front lit; the core gathers, flares and
+  goes out over 0.6 s, and the page stays empty behind the results until the next arrival.
+  The collapse does not touch the page's UI.
+  Reduced motion skips the burst and the collapse; `LandscapeMotion` fades the world in
+  and out from white instead. Cost: +1 draw (one point) during the intro only, no new triangles.
+- **Big bang on the page.** `ReactiveEnvironment` projects the core to screen and
+  publishes it through `genesisStage.ts` (the `worldTone` pattern), with a page radius on
+  the ground's own curve (`WorldGenesis.progress`), reaching the farthest corner as the
+  ground reaches its edges. `GenesisStage` (`runner/GenesisStage.tsx`) writes CSS
+  variables and `<html data-genesis>` (`waiting` → `playing` → `done`), never React
+  state: each `[data-genesis-reveal]` element (header, prompt/results, WPM counter) is
+  uncovered by a radial mask as the wave crosses it; nothing is drawn in the sky. The UI starts hidden
+  from SSR; if no arrival comes within 6 s it shows anyway. Reduced motion shows it at once.
 - **Traveling catch.** `energySweep` adds a narrow moving reflection inside the
   pools and one shelf caustic at z ≈ −1.85; it vanishes exactly at zero energy.
+
+To see the intro, use **Pace Debug → Replay intro**. `check-environment` asserts the
+big bang's timing, reveal coverage, frame-rate independence, replay and reduced motion.
 
 Verify: `node scripts/check-environment.mjs`, then with `npm run dev` running,
 `node scripts/review-composition.mjs --quick --wpm=90` and

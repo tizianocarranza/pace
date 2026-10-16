@@ -4,10 +4,14 @@ import { useState } from "react";
 import OrbDebugger from "./OrbDebugger";
 
 /** Imported only by the development build. No typing-engine state is writable here. */
-export default function WpmSimulator({ value, onChange, finished }: {
+export default function WpmSimulator({ value, onChange, finished, idle, onReplayIntro }: {
   value: number | null;
   onChange: (wpm: number | null) => void;
   finished: boolean;
+  /** The intro only replays from rest, before the first key. */
+  idle: boolean;
+  /** Pip runs in again from the left while the world fades in. */
+  onReplayIntro: () => void;
 }) {
   const [wpm, setWpm] = useState(30);
   const enabled = value !== null;
@@ -39,6 +43,8 @@ export default function WpmSimulator({ value, onChange, finished }: {
           </div>
         </fieldset>
         {finished && <p className="mt-2">Simulation pauses during results.</p>}
+        <button type="button" disabled={!idle} onClick={onReplayIntro}
+          className="mt-3 w-full rounded border border-neutral-200 py-1 disabled:opacity-40">Replay intro</button>
         <OrbDebugger />
       </details>
     </aside>

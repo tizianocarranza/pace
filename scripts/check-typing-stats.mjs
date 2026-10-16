@@ -11,7 +11,7 @@ const compiled = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
 }).outputText;
 await fs.writeFile(path.join(directory, 'typingStats.mjs'), compiled);
-const { liveWpm, averageWpm, accuracy, LIVE_WINDOW_MS } = await import(pathToFileURL(path.join(directory, 'typingStats.mjs')));
+const { liveWpm, averageWpm, accuracy, summarize, LIVE_WINDOW_MS } = await import(pathToFileURL(path.join(directory, 'typingStats.mjs')));
 
 /** Samples the live WPM every frame for a steady stream of correct keys, then a pause. */
 function run(wpm, typingMs, pauseMs = 0) {
@@ -65,5 +65,34 @@ assert.equal(averageWpm(5, 1000, 1000), 0);
 assert.equal(accuracy(0, 0), 100);
 assert.equal(accuracy(9, 10), 90);
 assert.equal(accuracy(2, 3), 67);
+
+// Summary of a finished run.
+{
+  const interval = 200; // 60 WPM
+  const correctTimes = Array.from({ length: 60 }, (_, i) => 1000 + i * interval);
+  const finishedAt = correctTimes.at(-1);
+  const steady = summarize({ startedAt: 1000, finishedAt, correctTimes, errorTimes: [3100], correct: 60, total: 61 });
+  assert.equal(steady.at, finishedAt);
+  assert.equal(steady.wpm, averageWpm(60, 1000, finishedAt));
+  assert.equal(steady.accuracy, 98);
+  assert.equal(steady.time, (finishedAt - 1000) / 1000);
+  assert.equal(steady.series[0].t, 0);
+  assert.equal(steady.series.at(-1).t, steady.time);
+  assert(steady.series.every((s, i) => i === 0 || s.t > steady.series[i - 1].t), 'series in time order');
+  assert.deepEqual(steady.errors, [2.1]);
+  assert(steady.peak >= 59 && steady.peak <= 62, `steady peak ${steady.peak}`);
+  assert(steady.consistency >= 95, `steady consistency ${steady.consistency}`);
+
+  // Bursts: fast for a second and a half, then a pause, repeated.
+  const bursty = [];
+  for (let t = 0; bursty.length < 60; t += 3000) for (let k = 0; k < 15 && bursty.length < 60; k++) bursty.push(1000 + t + k * 100);
+  const uneven = summarize({ startedAt: 1000, finishedAt: bursty.at(-1), correctTimes: bursty, errorTimes: [], correct: 60, total: 60 });
+  assert(uneven.consistency < steady.consistency - 15, `bursty consistency ${uneven.consistency}`);
+  assert(uneven.peak > uneven.wpm, 'bursts peak above the average');
+
+  // Tiny run: no crash, sane values.
+  const tiny = summarize({ startedAt: 0, finishedAt: 300, correctTimes: [0, 300], errorTimes: [], correct: 2, total: 2 });
+  assert(tiny.series.length >= 2 && tiny.consistency === 100 && Number.isFinite(tiny.peak));
+}
 
 console.log('typing stats ok');

@@ -1,0 +1,253 @@
+{
+  "status": "PASS",
+  "validated_asset": "public/models/pip.glb",
+  "method": "Independent GLB JSON/BIN accessor parsing, CPU glTF TRS interpolation, morphing and linear skinning; no .blend assumptions.",
+  "triangle_count": 12672,
+  "exported_vertex_count": 6346,
+  "bone_count": 4,
+  "bone_names": [
+    "Body",
+    "Foot.L",
+    "Foot.R",
+    "Root"
+  ],
+  "skin_count": 1,
+  "mesh_count": 5,
+  "meshes": [
+    {
+      "name": "Pip.Body",
+      "triangles": 8800,
+      "vertices": 4402,
+      "morph_targets": [
+        "Squash",
+        "Stretch"
+      ]
+    },
+    {
+      "name": "Pip.Eye.L",
+      "triangles": 720,
+      "vertices": 362,
+      "morph_targets": []
+    },
+    {
+      "name": "Pip.Eye.R",
+      "triangles": 720,
+      "vertices": 362,
+      "morph_targets": []
+    },
+    {
+      "name": "Pip.Foot.L",
+      "triangles": 1216,
+      "vertices": 610,
+      "morph_targets": []
+    },
+    {
+      "name": "Pip.Foot.R",
+      "triangles": 1216,
+      "vertices": 610,
+      "morph_targets": []
+    }
+  ],
+  "materials": [
+    {
+      "name": "Pip | Warm ivory matte",
+      "pbr": {
+        "baseColorFactor": [
+          0.8199999928474426,
+          0.7300000190734863,
+          0.6399999856948853,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.6800000071525574
+      }
+    },
+    {
+      "name": "Pip | Soft black eyes",
+      "pbr": {
+        "baseColorFactor": [
+          0.001500000013038516,
+          0.0010000000474974513,
+          0.000699999975040555,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.30000001192092896
+      }
+    }
+  ],
+  "file_bytes": 557812,
+  "file_kib": 544.74,
+  "rest_dimensions_xyz": [
+    2.146627,
+    1.954253,
+    2.285761
+  ],
+  "coordinate_system": "glTF Y-up, +Z forward",
+  "approved_static_max_position_error": {
+    "Pip.Body": 0.0,
+    "Pip.Eye.L": 0.0,
+    "Pip.Eye.R": 0.0,
+    "Pip.Foot.L": 0.0,
+    "Pip.Foot.R": 0.0
+  },
+  "clips": [
+    {
+      "name": "Idle",
+      "duration_seconds": 3.2,
+      "channels": 12,
+      "drives_morph_weights": false,
+      "endpoint_max_vertex_distance": 0.0,
+      "endpoint_max_world_matrix_delta": 0.0,
+      "seam_velocity_delta_units_per_second": 0.000156,
+      "seam_sample_step_seconds": 0.016667,
+      "loop_endpoint_pass": true,
+      "sampled_global_ground_min_y": 1e-06,
+      "sampled_global_ground_max_y": 1e-06
+    },
+    {
+      "name": "Run",
+      "duration_seconds": 0.8,
+      "channels": 12,
+      "drives_morph_weights": false,
+      "endpoint_max_vertex_distance": 0.0,
+      "endpoint_max_world_matrix_delta": 0.0,
+      "seam_velocity_delta_units_per_second": 0.267584,
+      "seam_sample_step_seconds": 0.013333,
+      "loop_endpoint_pass": true,
+      "sampled_global_ground_min_y": -1.4e-05,
+      "sampled_global_ground_max_y": 2e-05
+    },
+    {
+      "name": "Stumble",
+      "duration_seconds": 1.2,
+      "channels": 12,
+      "drives_morph_weights": false,
+      "endpoint_max_vertex_distance": 0.0,
+      "endpoint_max_world_matrix_delta": 0.0,
+      "sampled_global_ground_min_y": -0.000427,
+      "sampled_global_ground_max_y": 0.120805,
+      "recovery_max_distance_from_rest": 2.4e-07
+    }
+  ],
+  "morph_targets": [
+    "Squash",
+    "Stretch"
+  ],
+  "morph_weights_animated": false,
+  "body_only_morph_checks": [
+    {
+      "Squash": 0,
+      "Stretch": 0,
+      "body_dimensions_xyz": [
+        2.146627,
+        1.924202,
+        2.285761
+      ],
+      "ground_min_y": 1e-06
+    },
+    {
+      "Squash": 1,
+      "Stretch": 0,
+      "body_dimensions_xyz": [
+        2.425689,
+        1.66751,
+        2.448329
+      ],
+      "ground_min_y": 1e-06
+    },
+    {
+      "Squash": 0,
+      "Stretch": 1,
+      "body_dimensions_xyz": [
+        2.060762,
+        1.657424,
+        3.261173
+      ],
+      "ground_min_y": 1e-06
+    },
+    {
+      "Squash": 0.5,
+      "Stretch": 0.5,
+      "body_dimensions_xyz": [
+        2.243225,
+        1.662467,
+        2.854751
+      ],
+      "ground_min_y": 1e-06
+    },
+    {
+      "Squash": 1,
+      "Stretch": 1,
+      "body_dimensions_xyz": [
+        2.339824,
+        1.612764,
+        3.423741
+      ],
+      "ground_min_y": 1e-06
+    }
+  ],
+  "run_playback_checks": [
+    {
+      "speed": 0.6,
+      "wall_loop_seconds": 1.333333,
+      "evaluations": 165,
+      "minimum_ground_y": -1.1e-05,
+      "maximum_airborne_ground_y": 5e-06,
+      "maximum_dimensions_xyz": [
+        2.425689,
+        2.014129,
+        3.437279
+      ],
+      "finite_bounds_pass": true
+    },
+    {
+      "speed": 1.0,
+      "wall_loop_seconds": 0.8,
+      "evaluations": 165,
+      "minimum_ground_y": -1.1e-05,
+      "maximum_airborne_ground_y": 5e-06,
+      "maximum_dimensions_xyz": [
+        2.425689,
+        2.014129,
+        3.437279
+      ],
+      "finite_bounds_pass": true
+    },
+    {
+      "speed": 2.0,
+      "wall_loop_seconds": 0.4,
+      "evaluations": 165,
+      "minimum_ground_y": -1.1e-05,
+      "maximum_airborne_ground_y": 5e-06,
+      "maximum_dimensions_xyz": [
+        2.425689,
+        2.014129,
+        3.437279
+      ],
+      "finite_bounds_pass": true
+    }
+  ],
+  "cameras": 0,
+  "lights": 0,
+  "images": 0,
+  "environment_meshes": 0,
+  "checks": [
+    "GLB headers, buffer bounds, finite accessor values and declared extrema",
+    "Triangle indices, normals, nondegenerate base geometry",
+    "Joint indices, normalized skin weights, invertible inverse-bind matrices",
+    "Exported rest geometry equals approved evaluated static geometry",
+    "Exactly Idle/Run/Stumble; separate clips and normalized quaternions",
+    "Idle and Run matching world-matrix and skinned-vertex loop endpoints",
+    "Stumble recovery returns to approved rest geometry",
+    "Run sampled at 0.6x, 1x and 2x with five independent morph combinations",
+    "Runtime body-only Squash/Stretch survives export without animated weights",
+    "Two texture-free opaque nonmetallic materials and no environment objects"
+  ],
+  "limitations": [
+    "CPU playback validation is not a browser/GPU integration test; the application was not modified.",
+    "Loop endpoints are numerically verified; finite-difference seam velocity is reported, not a proof of continuous derivatives.",
+    "Ground bounds are sampled, not a continuous collision/intersection solver; no floor is exported.",
+    "Morph values were tested on [0,1], including simultaneous full influences; values outside this range are not supported."
+  ]
+}

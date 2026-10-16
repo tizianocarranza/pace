@@ -14,6 +14,7 @@ export class LandscapeMotion {
   lag = 0;
   visibility = 1;
   private previousStatus: PipStatus = "idle";
+  private seenArrival = 0;
 
   update(delta: number, motion: PipMotionSignals | null, status: PipStatus) {
     const dt = Number.isFinite(delta) ? MathUtils.clamp(delta, 0, 0.05) : 0;
@@ -22,8 +23,17 @@ export class LandscapeMotion {
       this.visibility = 1;
     }
     this.previousStatus = status;
-    const active = status !== "idle" && motion?.active;
-    const fade = status === "finished" && !motion?.active ? 0 : 1;
+    // Each arrival (the intro) is consumed once. The big bang (worldGenesis.ts) reveals the
+    // world; with reduced motion there is no burst, so it fades in from white instead.
+    const arrival = motion?.arrivalSequence ?? 0;
+    if (arrival !== this.seenArrival) {
+      this.seenArrival = arrival;
+      if (motion?.reducedMotion) this.visibility = 0;
+    }
+    const active = (status !== "idle" || motion?.arriving) && motion?.active;
+    // After the exit the world collapses into the core (worldGenesis.ts); only reduced
+    // motion, which has no collapse, fades it out instead.
+    const fade = status === "finished" && !motion?.active && motion?.reducedMotion ? 0 : 1;
     this.visibility = MathUtils.damp(this.visibility, fade, 4, dt);
     // Freeze traversal without snapping the visible pose.
     if (motion?.reducedMotion) { this.velocity = 0; return; }
