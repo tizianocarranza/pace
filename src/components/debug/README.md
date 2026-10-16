@@ -21,6 +21,12 @@ Simulated zero speed uses the regular deceleration; it does not reset world trav
 Real prompt completion takes priority, retains the normal finish/results flow,
 and temporarily suspends the simulator. Real typing still works while it is enabled.
 
+**Error highlight** switches how a mistake shows in the prompt (`errorStyle.ts`):
+`current` (flash and sideways shake), `glow` (peach halo, vertical caret pulse), `blur`
+(the letter loses focus and sharpens), `marks` (glow plus a dot under every missed
+letter), `haze` (a peach glow behind the letter), `word` (a wash over the
+whole word), `caret` (only the caret glows) or `dip` (the letter sinks a hair). Production always uses `APPROVED_ERROR_STYLE` (currently `caret`), and a reload starts from it.
+
 **Replay intro** (only before the first key) runs the intro again: the world fades in
 from white and Pip runs in from the left. Production always passes `introReplay={0}`.
 

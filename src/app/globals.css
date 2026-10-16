@@ -346,6 +346,197 @@ html[data-genesis="playing"] [data-genesis-reveal] {
   animation: caret-shake 260ms var(--ease-out);
 }
 
+/* Error styles (errorStyle.ts, switched in Pace Debug). None moves sideways. */
+
+/* Glow: the expected letter blooms in a peach halo and settles back into the haze. */
+[data-error-style="glow"] .char-error,
+[data-error-style="marks"] .char-error {
+  animation: char-glow 560ms var(--ease-out) both;
+}
+
+@keyframes char-glow {
+  0% {
+    color: var(--miss);
+    text-shadow: 0 0 0 rgb(240 144 106 / 0);
+  }
+
+  30% {
+    color: var(--miss);
+    text-shadow: 0 0 10px rgb(240 144 106 / 0.6), 0 0 24px rgb(240 144 106 / 0.3);
+  }
+
+  to {
+    color: var(--pending);
+    text-shadow: 0 0 0 rgb(240 144 106 / 0);
+  }
+}
+
+/* The caret tints and draws in once, vertically, instead of shaking. */
+[data-error-style="glow"] .caret-pulse,
+[data-error-style="marks"] .caret-pulse {
+  animation: caret-pulse 380ms var(--ease-out);
+}
+
+@keyframes caret-pulse {
+  35% {
+    transform: scaleY(0.68);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Blur: the expected letter loses focus with a peach tint, then sharpens again. */
+[data-error-style="blur"] .char-error {
+  animation: char-blur 520ms var(--ease-out) both;
+}
+
+@keyframes char-blur {
+  0% {
+    color: var(--miss);
+    filter: blur(0);
+  }
+
+  22% {
+    color: var(--miss);
+    filter: blur(3px);
+  }
+
+  to {
+    color: var(--pending);
+    filter: blur(0);
+  }
+}
+
+/* Marks: a faint peach dot stays under every letter that was mistyped. */
+.char-missed::after {
+  content: "";
+  position: absolute;
+  bottom: -0.08em;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--miss) 55%, transparent);
+  animation: missed-in 420ms var(--ease-out) backwards;
+}
+
+@keyframes missed-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Styles that leave the letter's own color alone keep it in the haze (pending). */
+[data-error-style="haze"] .char-error,
+[data-error-style="word"] .char-error,
+[data-error-style="caret"] .char-error {
+  animation: none;
+}
+
+/* Haze: a soft peach glow blooms behind the letter, like the intro's core. */
+[data-error-style="haze"] .char-error::before {
+  content: "";
+  position: absolute;
+  inset: -0.12em -0.22em;
+  z-index: -1;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, rgb(240 144 106 / 0.38), rgb(240 144 106 / 0));
+  animation: error-haze 640ms var(--ease-out) both;
+}
+
+@keyframes error-haze {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
+/* Word: a faint peach wash over the whole current word. */
+.word-error {
+  position: absolute;
+  inset: 0.08em -0.18em;
+  z-index: -1;
+  border-radius: 0.4em;
+  background: rgb(240 144 106 / 0.16);
+  pointer-events: none;
+  animation: error-word 700ms var(--ease-out) both;
+}
+
+@keyframes error-word {
+  0% {
+    opacity: 0;
+  }
+
+  25% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+/* Caret: only the caret tells, tinting and glowing peach. */
+[data-error-style="caret"] .caret-bar-error {
+  animation: caret-glow-miss 620ms var(--ease-out) both;
+}
+
+@keyframes caret-glow-miss {
+  0%,
+  30% {
+    box-shadow: 0 0 10px rgb(240 144 106 / 0.75), 0 0 22px rgb(240 144 106 / 0.35);
+  }
+}
+
+.caret-flare {
+  animation: caret-flare 520ms var(--ease-out);
+}
+
+@keyframes caret-flare {
+  30% {
+    transform: scaleX(1.6);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Dip: the letter sinks a hair with a peach tint and settles back (vertical only). */
+[data-error-style="dip"] .char-error {
+  animation: error-dip 480ms var(--ease-out) both;
+}
+
+@keyframes error-dip {
+  0% {
+    color: var(--miss);
+    transform: translateY(0);
+  }
+
+  25% {
+    color: var(--miss);
+    transform: translateY(0.08em);
+  }
+
+  to {
+    color: var(--pending);
+    transform: translateY(0);
+  }
+}
+
 @keyframes caret-blink {
   0%,
   100% {
@@ -393,8 +584,20 @@ html[data-genesis="playing"] [data-genesis-reveal] {
   .results-chart-miss,
   .word-enter,
   .char-typed,
-  .caret-shake {
+  .caret-shake,
+  .caret-pulse,
+  .caret-flare,
+  .char-missed::after,
+  [data-error-style="haze"] .char-error::before {
     animation: none;
+  }
+
+  [data-error-style="dip"] .char-error {
+    animation: char-miss 420ms var(--ease-out) both;
+  }
+
+  [data-error-style="blur"] .char-error {
+    animation: char-miss 420ms var(--ease-out) both;
   }
 
   .typing-text.text-exit {
