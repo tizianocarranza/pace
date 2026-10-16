@@ -11,8 +11,11 @@ Stack: Next 16 (App Router, read AGENTS.md), React 19, @react-three/fiber 9,
 
 ## Map
 
-- `src/app/page.tsx` — game shell, HTML UI, keyboard input, results.
-- `src/hooks/useTypingEngine.ts` — the only owner of real statistics (WPM, accuracy, errors).
+- `src/app/page.tsx` — game shell, HTML UI, keyboard input.
+- `src/hooks/useTypingEngine.ts` — the only owner of real statistics (WPM, accuracy, errors);
+  the formulas are pure functions in `src/lib/typingStats.ts`.
+- `src/components/results/` — results screen (chart, stats); `src/lib/runHistory.ts` keeps
+  past runs in `localStorage` for best/average/history.
 - `src/lib/visualSpeed.ts` — the single WPM → visual intensity curve.
 - `src/components/runner/` — Canvas, Pip, motion controller, contacts, shadow, reflection.
 - `src/components/runner/environment/` — landscape, shaders, materials, world motion/energy.

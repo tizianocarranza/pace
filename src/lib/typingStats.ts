@@ -54,3 +54,74 @@ export function averageWpm(correct: number, startedAt: number | null, endedAt: n
 export function accuracy(correct: number, total: number) {
   return total === 0 ? 100 : Math.round((correct / total) * 100);
 }
+
+/** A finished run as the engine recorded it (timestamps in ms). */
+export type RunRecord = {
+  startedAt: number;
+  finishedAt: number;
+  correctTimes: readonly number[];
+  errorTimes: readonly number[];
+  correct: number;
+  total: number;
+};
+
+export type RunSummary = {
+  /** Finish timestamp; identifies the run in the saved history. */
+  at: number;
+  wpm: number;
+  accuracy: number;
+  /** Seconds from the first key to the last. */
+  time: number;
+  /** Live WPM over the run, sampled every SERIES_STEP seconds and at the finish. */
+  series: { t: number; wpm: number }[];
+  /** Seconds from the start at which each wrong key was pressed. */
+  errors: number[];
+  /** Highest live WPM once the pace has settled in. */
+  peak: number;
+  /** How steady the pace was: 100 is perfectly even. */
+  consistency: number;
+};
+
+const SERIES_STEP = 0.5;
+/** The first second reads from only a few keys, too noisy for peak and consistency. */
+const SETTLE = 1;
+
+/** Live WPM at `at`, as the counter showed it then. */
+function liveWpmAt(correctTimes: readonly number[], at: number, startedAt: number) {
+  let count = 0;
+  while (count < correctTimes.length && correctTimes[count] <= at) count++;
+  return liveWpm(correctTimes.slice(0, count), at, startedAt, count);
+}
+
+/** Everything the results show, computed once the run is over. */
+export function summarize(run: RunRecord): RunSummary {
+  const duration = Math.max(0, (run.finishedAt - run.startedAt) / 1000);
+  const series: RunSummary["series"] = [];
+  for (let t = 0; t < duration; t += SERIES_STEP) {
+    series.push({ t, wpm: liveWpmAt(run.correctTimes, run.startedAt + t * 1000, run.startedAt) });
+  }
+  series.push({ t: duration, wpm: liveWpmAt(run.correctTimes, run.finishedAt, run.startedAt) });
+
+  const settled = series.filter(sample => sample.t >= SETTLE).map(sample => sample.wpm);
+  const peak = Math.max(0, ...(settled.length > 0 ? settled : series.map(sample => sample.wpm)));
+  let consistency = run.correct > 0 ? 100 : 0;
+  if (settled.length >= 2) {
+    const mean = settled.reduce((sum, wpm) => sum + wpm, 0) / settled.length;
+    const variance = settled.reduce((sum, wpm) => sum + (wpm - mean) ** 2, 0) / settled.length;
+    consistency = mean > 0 ? Math.round(Math.min(1, Math.max(0, 1 - Math.sqrt(variance) / mean)) * 100) : 0;
+  }
+
+  const wpm = averageWpm(run.correct, run.startedAt, run.finishedAt);
+  return {
+    at: run.finishedAt,
+    wpm,
+    accuracy: accuracy(run.correct, run.total),
+    time: duration,
+    series,
+    errors: run.errorTimes.map(time => (time - run.startedAt) / 1000),
+    // The average counts the first key, the live window measures between keys; a steady
+    // run can read one apart, and a peak below the average would look wrong.
+    peak: Math.max(peak, wpm),
+    consistency,
+  };
+}

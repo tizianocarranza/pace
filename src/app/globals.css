@@ -23,6 +23,46 @@ body {
   animation: results-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Results chart: the line draws itself left to right, its haze and the misses follow. */
+.results-chart-line {
+  stroke-dasharray: 1;
+  animation: chart-draw 1100ms cubic-bezier(0.45, 0, 0.2, 1) 250ms both;
+}
+
+.results-chart-area {
+  animation: chart-fade 900ms ease-out 600ms both;
+}
+
+.results-chart-miss {
+  fill: var(--miss);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chart-miss 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.results-best {
+  background: linear-gradient(90deg, var(--caret-from), var(--caret-to));
+  background-clip: text;
+  color: transparent;
+}
+
+.results-history-current {
+  background: linear-gradient(var(--caret-from), var(--caret-to));
+}
+
+@keyframes chart-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes chart-fade {
+  from { opacity: 0; }
+}
+
+@keyframes chart-miss {
+  from { opacity: 0; transform: scale(0.3); }
+}
+
 :root {
   /* Drawn from the world: Pip's eyes, the pearl haze, violet → blue light, warm peach. */
   --ink: #3d3a55;
@@ -324,6 +364,9 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .results-enter,
+  .results-chart-line,
+  .results-chart-area,
+  .results-chart-miss,
   .word-enter,
   .char-typed,
   .caret-shake {

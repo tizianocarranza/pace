@@ -1,8 +1,8 @@
 "use client";
 
 import { useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
-import { Quicksand } from "next/font/google";
 import { orbTuning } from "./orbTuning";
+import { quicksand } from "@/lib/fonts";
 import { FLOOR_WARMTH } from "@/components/runner/environment/floorWarmth";
 import { worldTone } from "@/components/runner/environment/worldTone";
 
@@ -13,9 +13,6 @@ type WpmCounterProps = {
   intensity: number;
   className?: string;
 };
-
-/** Rounded, soft figures for the number only; the rest of the UI keeps its font. */
-const quicksand = Quicksand({ subsets: ["latin"], weight: ["500"] });
 
 /** Columns, most significant first: hundreds, tens, ones. */
 const COLUMNS = [2, 1, 0] as const;

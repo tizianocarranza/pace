@@ -2,6 +2,7 @@
 
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useTypingEngine } from "@/hooks/useTypingEngine";
+import { Results } from "@/components/results/Results";
 import { Runner } from "@/components/runner/Runner";
 import { TypingText } from "@/components/typing/TypingText";
 import { WpmCounter } from "@/components/typing/WpmCounter";
@@ -19,12 +20,10 @@ export default function Home() {
   const {
     currentIndex,
     currentWpm,
-    accuracy,
     status,
     lastCorrectAt,
     errorCount,
-    averageWpm,
-    elapsedTime,
+    summary,
     handleKey,
     reset,
   } = useTypingEngine({
@@ -78,33 +77,7 @@ export default function Home() {
             className="w-[min(48rem,80vw)] text-center text-[clamp(1.6rem,2.5vw,2.75rem)] leading-[1.3] font-normal tracking-[-0.035em]"
           />
         ) : (
-          <div className="results-enter flex flex-col items-center">
-            <div className="text-5xl tabular-nums">{averageWpm}</div>
-
-            <div className="mt-1 text-xs uppercase tracking-[0.18em] text-[#a9a5c8]">
-              WPM
-            </div>
-
-            <div className="mt-8 flex gap-8 text-sm">
-              <div className="flex flex-col items-center">
-                <span>{accuracy}%</span>
-                <span className="text-[#a9a5c8]">accuracy</span>
-              </div>
-
-              <div className="flex flex-col items-center">
-                <span>{elapsedTime.toFixed(1)}s</span>
-                <span className="text-[#a9a5c8]">time</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleTryAgain}
-              className="mt-10 cursor-pointer text-sm underline underline-offset-4"
-            >
-              try again
-            </button>
-          </div>
+          summary && <Results summary={summary} onTryAgain={handleTryAgain} />
         )}
       </section>
 

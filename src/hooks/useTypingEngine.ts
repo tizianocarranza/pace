@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { accuracy as accuracyOf, averageWpm as averageWpmOf, LIVE_WINDOW_MS, liveWpm } from "@/lib/typingStats";
+import {
+  accuracy as accuracyOf, averageWpm as averageWpmOf, LIVE_WINDOW_MS, liveWpm, summarize, type RunSummary,
+} from "@/lib/typingStats";
 
 type UseTypingEngineOptions = {
   text: string;
@@ -19,9 +21,12 @@ type Run = {
   total: number;
   /** Timestamps of correct keys still inside the live window, oldest first. */
   recent: number[];
+  /** Every correct and wrong key of the run, for the results. */
+  correctTimes: number[];
+  errorTimes: number[];
 };
 
-const freshRun = (text: string): Run => ({ text, index: 0, startedAt: null, correct: 0, total: 0, recent: [] });
+const freshRun = (text: string): Run => ({ text, index: 0, startedAt: null, correct: 0, total: 0, recent: [], correctTimes: [], errorTimes: [] });
 
 export function useTypingEngine({ text }: UseTypingEngineOptions) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -34,6 +39,8 @@ export function useTypingEngine({ text }: UseTypingEngineOptions) {
   const [currentWpm, setCurrentWpm] = useState(0);
   /** True while the live WPM may still move; the ticker sleeps otherwise. */
   const [live, setLive] = useState(false);
+  /** Everything the results show; null until the run is finished. */
+  const [summary, setSummary] = useState<RunSummary | null>(null);
 
   const run = useRef<Run>(freshRun(text));
 
@@ -77,10 +84,18 @@ export function useTypingEngine({ text }: UseTypingEngineOptions) {
       r.correct += 1;
       r.index += 1;
       r.recent.push(now);
+      r.correctTimes.push(now);
       setCurrentIndex(r.index);
       setLastCorrectAt(now);
-      if (r.index >= r.text.length) setFinishedAt(now);
+      if (r.index >= r.text.length) {
+        setFinishedAt(now);
+        setSummary(summarize({
+          startedAt: r.startedAt, finishedAt: now, correctTimes: r.correctTimes,
+          errorTimes: r.errorTimes, correct: r.correct, total: r.total,
+        }));
+      }
     } else {
+      r.errorTimes.push(now);
       setErrorCount((count) => count + 1);
     }
     setCorrect(r.correct);
@@ -101,6 +116,7 @@ export function useTypingEngine({ text }: UseTypingEngineOptions) {
     setLastCorrectAt(null);
     setCurrentWpm(0);
     setLive(false);
+    setSummary(null);
   }, []);
 
   // Results only: the time is read once the run is finished.
@@ -123,6 +139,7 @@ export function useTypingEngine({ text }: UseTypingEngineOptions) {
     accuracy,
     lastCorrectAt,
     status,
+    summary,
     errorCount,
     handleKey,
     reset,
