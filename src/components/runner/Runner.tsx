@@ -39,6 +39,22 @@ function StudioFraming() {
   return null;
 }
 
+const hidden: THREE.Object3D[] = [];
+
+/** Runs `work` with every hidden object shown (light trails at rest, the genesis core, the
+ * sky body of the other theme), then hides them again. */
+function withHiddenShown<T>(scene: THREE.Scene, work: () => T): T {
+  hidden.length = 0;
+  scene.traverse(object => { if (!object.visible) hidden.push(object); });
+  try {
+    for (const object of hidden) object.visible = true;
+    return work();
+  } finally {
+    for (const object of hidden) object.visible = false;
+    hidden.length = 0;
+  }
+}
+
 /** Mounts with the rest of the scene (the Canvas suspends its children together while
  * Pip's GLB loads), compiles the shaders off the main thread where the driver allows,
  * then reports ready once a frame has been presented. */
@@ -49,12 +65,18 @@ function SceneReady({ onReady }: { onReady: () => void }) {
     let frame = 0;
     const presented = () => {
       if (cancelled) return;
+      // compile() only links programs; the driver finishes them on first draw (~70 ms per
+      // program on ANGLE/D3D11). Draw everything once while the canvas is still transparent,
+      // so the first trail or the first theme switch never stalls mid-run.
+      try { withHiddenShown(scene, () => gl.render(scene, camera)); } catch { /* only a warm-up */ }
       frame = requestAnimationFrame(() => {
         frame = requestAnimationFrame(() => { if (!cancelled) onReady(); });
       });
     };
+    // compile() only walks visible objects, so the hidden ones are shown for its synchronous
+    // part; the polling that follows needs no scene.
     // A failed precompile only costs the stall it was meant to avoid; never keep the loader up.
-    gl.compileAsync(scene, camera).then(presented, presented);
+    withHiddenShown(scene, () => gl.compileAsync(scene, camera)).then(presented, presented);
     return () => { cancelled = true; cancelAnimationFrame(frame); };
   }, [gl, scene, camera, onReady]);
   return null;
