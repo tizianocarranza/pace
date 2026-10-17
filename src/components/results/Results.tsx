@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type MouseEvent } from "react";
 import { WpmChart } from "./WpmChart";
 import { quicksand } from "@/lib/fonts";
 import { recordRun, type Progress } from "@/lib/runHistory";
 import { modeKey, type RunMode } from "@/lib/runMode";
+import { resultSlug, type SharedResult } from "@/lib/shareResult";
 import type { RunSummary } from "@/lib/typingStats";
 
 type ResultsProps = {
@@ -23,6 +24,37 @@ function saveRun(summary: RunSummary, mode: RunMode): Progress | null {
   } catch {
     return null;
   }
+}
+
+/** Shares a link to the run, whose card shows it: the system share sheet where there is
+ * one (phones), else the link is copied. */
+function ShareButton({ result }: { result: SharedResult }) {
+  const [copied, setCopied] = useState(false);
+
+  const share = async (event: MouseEvent<HTMLButtonElement>) => {
+    // Keep focus off the button, so a key after sharing is never read as a press.
+    event.currentTarget.blur();
+    const url = `${window.location.origin}/r/${resultSlug(result)}`;
+    const text = `I typed ${result.wpm} WPM on pace.`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "pace.", text, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Share sheet dismissed, or clipboard denied: nothing to undo.
+    }
+  };
+
+  return (
+    <button type="button" onClick={share}
+      className="cursor-pointer text-[var(--muted)] transition-colors duration-300 hover:text-[var(--ink)] focus-visible:text-[var(--ink)]">
+      {copied ? "link copied" : "share"}
+    </button>
+  );
 }
 
 /** Each block eases in a little after the one above it. */
@@ -92,14 +124,12 @@ export function Results({ summary, mode, onTryAgain }: ResultsProps) {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onTryAgain}
-        className="results-enter mt-10 cursor-pointer text-sm underline underline-offset-4 max-sm:mt-6"
-        style={enter(4)}
-      >
-        try again
-      </button>
+      <div className="results-enter mt-10 flex items-center gap-6 text-sm max-sm:mt-6" style={enter(4)}>
+        <button type="button" onClick={onTryAgain} className="cursor-pointer underline underline-offset-4">
+          try again
+        </button>
+        <ShareButton result={{ wpm: summary.wpm, accuracy: summary.accuracy, mode }} />
+      </div>
     </div>
   );
 }
