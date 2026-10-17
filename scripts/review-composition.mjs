@@ -9,6 +9,7 @@ const output = path.resolve(process.env.PACE_REVIEW_DIR ?? 'assets/reviews/compo
 await mkdir(output, { recursive: true });
 const quick = process.argv.includes('--quick');
 const mobile = process.argv.includes('--mobile');
+const night = process.argv.includes('--night');
 const simulatedWpm = Number(process.argv.find(a => a.startsWith('--wpm='))?.split('=')[1] ?? 60);
 const width = mobile ? 390 : 1536, height = mobile ? 844 : 1024;
 const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', [
@@ -49,6 +50,7 @@ try {
   };
   await call('Runtime.enable'); await call('Page.enable');
   await call('Page.addScriptToEvaluateOnNewDocument', { source: `
+    try { localStorage.setItem('pace-theme', '${night ? 'night' : 'day'}'); } catch {}
     window.reviewTime=0; const epoch=Date.now(); performance.now=()=>window.reviewTime; Date.now=()=>epoch+window.reviewTime;
     window.reviewBuffers={created:0,deleted:0};
     for(const [method,key] of [['createBuffer','created'],['deleteBuffer','deleted']]){const p=WebGL2RenderingContext.prototype, original=p[method];p[method]=function(...args){window.reviewBuffers[key]++;return original.apply(this,args);};}
@@ -70,7 +72,7 @@ try {
   await sleep(500);
   // The clock is stepped, so play the intro (big bang, then Pip running in: ~3.1 s) first.
   await advance(240);
-  const prefix = mobile ? 'mobile' : 'desktop';
+  const prefix = `${mobile ? 'mobile' : 'desktop'}${night ? '-night' : ''}`;
   await shot(`${prefix}-idle`);
   await evaluate(`const box=document.querySelector('aside input[type=checkbox]');box.closest('aside').querySelector('details').open=true;box.click();Array.from(box.closest('aside').querySelectorAll('button')).find(b=>b.textContent==='${simulatedWpm}').click();document.querySelectorAll('aside').forEach(a=>a.style.visibility='hidden');`);
   await sleep(100);
