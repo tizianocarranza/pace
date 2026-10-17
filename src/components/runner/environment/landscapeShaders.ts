@@ -88,6 +88,14 @@ export const landscapeFragment = /* glsl */ `
     return (1.0 - nearFade) * (1.0 - farFade) * (1.0 - edge) * frame * uVisibility * genesisReveal(vWorld);
   }
   void main() {
+    // Outside the frame, the fades and the genesis reveal the world is exactly the page:
+    // skip the shading there (the result is identical, the masks are exact zeros).
+    float presence = surfacePresence();
+    if (presence <= 0.0) {
+      gl_FragColor = vec4(uPage, 1.0);
+      #include <colorspace_fragment>
+      return;
+    }
     vec3 view = normalize(cameraPosition - vWorld);
     // Terrain normals always point out of the height field. Flipping them near a
     // grazing ridge creates a dark seam where smooth and triangle normals differ.
@@ -113,53 +121,65 @@ export const landscapeFragment = /* glsl */ `
     float slope = 1.0 - smoothstep(0.15, 0.98, n.y);
     // Orientation drives the palette, rather than screen-space fills.
     float pearlShift = smoothstep(-0.65, 0.8, reflection.x + reflection.y * 0.35);
-    vec3 pearl = mix(uViolet, uBlue, pearlShift);
-
     float crest = smoothstep(-0.75, 2.5, vWorld.y);
-    vec3 mineral = mix(uBlue * 0.65, uViolet * 0.9, 1.0 - pearlShift);
-    vec3 color = mix(mineral, uPearl, 0.12 + 0.58 * pow(light, 3.0));
-    color = mix(color, pearl, (0.16 + 0.3 * slope) * (0.55 + 0.45 * fresnel));
-    color = mix(color, uPearl, crest * 0.12);
-    // Warm and cool pools fall across the same ridge/valley system.
     float ridgeCatch = pow(max(dot(n, normalize(uWarmDirection + vec3(0.0, 0.7, 0.0))), 0.0), 2.0);
-    color = mix(color, uWarmLight, warmPool * (0.05 + ridgeCatch * 0.24));
-    color = mix(color, mix(uViolet, uCoolLight, 0.5), coolPool * slope * 0.18);
-    // An elongated soft reflection reads as a satin/pearl surface at grazing angles.
     vec3 cardDelta = reflection - normalize(vec3(-0.25, 0.4, -0.9));
     float lobe = exp(-dot(cardDelta * vec3(1.25, 4.4, 1.8), cardDelta * vec3(1.25, 4.4, 1.8)));
-    color = mix(color, mix(uWarmLight, vec3(1.0), 0.68), lobe * (0.26 + fresnel * 0.38));
     float pathLight = 0.2 + 0.8 * smoothstep(0.5, 1.5, abs(vWorld.z));
-    color = mix(color, mix(uWarmLight, vec3(1.0), 0.66), transmittedPool * pathLight * (0.3 + ridgeCatch * 0.35));
-    color += vec3(1.0, 0.94, 0.88) * transmittedPool * ridgeCatch * pathLight * 0.16;
     float path = 1.0 - smoothstep(0.65, 3.3, abs(vWorld.z + 0.1));
-    color = mix(color, uPearl, path * 0.48);
+    float haze = distanceHaze(vWorld);
 
-    // Shared colored irradiance. Shading lifts toward white rather than sinking into grey mid-tones.
-    color *= vec3(0.80 + light * 0.22) + uWarmLight * warmEnergy * 0.10 + uCoolLight * coolEnergy * 0.10;
-    float warmReflection = studioCard(reflection, uWarmDirection, 0.14);
-    color = mix(color, uWarmLight, min(0.5, warmEnergy * 0.035 + warmReflection * 0.24));
-    color = mix(color, uCoolLight, coolEnergy * (0.025 + fresnel * 0.12));
+    // Narrow traveling reflection. The quiet finish is recovered exactly at zero, so
+    // at rest (uEnergy.x == 0) the sweep is not evaluated at all.
+    vec3 caught = vec3(0.0);
+    float energyMix = 0.0;
+    if (uEnergy.x > 0.0) {
+      float opticalEnergy = uEnergy.x * energyContinuity(vWorld);
+      float traveling = energySweep(vWorld);
+      caught = mix(uCoolLight, uWarmLight, warmPool * 0.75 + warmBacklight * 0.2);
+      // Refracted light grazes one shelf beside the lane. It remains a surface
+      // reflection, spatially confined to the warm/cool pools.
+      float shelf = vWorld.z + 1.85 + sin(vWorld.x * 0.55 + uEnergyPhase) * 0.36;
+      float caustic = exp(-shelf * shelf / 0.035) * (warmPool + coolPool) * 0.5;
+      float catchLight = traveling * (0.48 + 0.52 * fresnel) * (0.2 + slope * 0.6) * (warmPool + coolPool) * 0.6
+        + caustic * (0.3 + traveling * 0.7);
+      energyMix = min(0.7, catchLight * opticalEnergy * (0.7 + uEnergy.y * 0.3 + uEnergy.z));
+    }
 
-    // Narrow traveling reflection. The quiet finish is recovered exactly at zero.
-    float opticalEnergy = uEnergy.x * energyContinuity(vWorld);
-    float traveling = energySweep(vWorld);
-    vec3 caught = mix(uCoolLight, uWarmLight, warmPool * 0.75 + warmBacklight * 0.2);
-    // Refracted light grazes one shelf beside the lane. It remains a surface
-    // reflection, spatially confined to the warm/cool pools.
-    float shelf = vWorld.z + 1.85 + sin(vWorld.x * 0.55 + uEnergyPhase) * 0.36;
-    float caustic = exp(-shelf * shelf / 0.035) * (warmPool + coolPool) * 0.5;
-    float catchLight = traveling * (0.48 + 0.52 * fresnel) * (0.2 + slope * 0.6) * (warmPool + coolPool) * 0.6
-      + caustic * (0.3 + traveling * 0.7);
-    color = mix(color, caught, min(0.7, catchLight * opticalEnergy * (0.7 + uEnergy.y * 0.3 + uEnergy.z)));
+    // Day palette, skipped once the night crossfade is complete.
+    vec3 color = vec3(0.0);
+    if (uNight < 1.0) {
+      vec3 pearl = mix(uViolet, uBlue, pearlShift);
+      vec3 mineral = mix(uBlue * 0.65, uViolet * 0.9, 1.0 - pearlShift);
+      color = mix(mineral, uPearl, 0.12 + 0.58 * pow(light, 3.0));
+      color = mix(color, pearl, (0.16 + 0.3 * slope) * (0.55 + 0.45 * fresnel));
+      color = mix(color, uPearl, crest * 0.12);
+      // Warm and cool pools fall across the same ridge/valley system.
+      color = mix(color, uWarmLight, warmPool * (0.05 + ridgeCatch * 0.24));
+      color = mix(color, mix(uViolet, uCoolLight, 0.5), coolPool * slope * 0.18);
+      // An elongated soft reflection reads as a satin/pearl surface at grazing angles.
+      color = mix(color, mix(uWarmLight, vec3(1.0), 0.68), lobe * (0.26 + fresnel * 0.38));
+      color = mix(color, mix(uWarmLight, vec3(1.0), 0.66), transmittedPool * pathLight * (0.3 + ridgeCatch * 0.35));
+      color += vec3(1.0, 0.94, 0.88) * transmittedPool * ridgeCatch * pathLight * 0.16;
+      color = mix(color, uPearl, path * 0.48);
 
-    // Local diffusion is evaluated on surfaces, leaving the HTML text and empty sky crisp.
-    float pathClarity = 1.0 - smoothstep(0.4, 1.5, abs(vWorld.z));
-    float diffusion = (warmPool * 0.08 + amberPool * 0.14 + transmittedPool * 0.1) * (1.0 - pathClarity * 0.72);
-    color = mix(color, mix(uWarmLight, vec3(1.0), 0.76), diffusion);
-    // The floor warms with the sustained pace, before distance air.
-    color = floorWarmth(color, vWorld);
-    vec3 air = mix(uCoolLight, vec3(1.0), 0.88);
-    color = mix(color, air, distanceHaze(vWorld));
+      // Shared colored irradiance. Shading lifts toward white rather than sinking into grey mid-tones.
+      color *= vec3(0.80 + light * 0.22) + uWarmLight * warmEnergy * 0.10 + uCoolLight * coolEnergy * 0.10;
+      float warmReflection = studioCard(reflection, uWarmDirection, 0.14);
+      color = mix(color, uWarmLight, min(0.5, warmEnergy * 0.035 + warmReflection * 0.24));
+      color = mix(color, uCoolLight, coolEnergy * (0.025 + fresnel * 0.12));
+
+      color = mix(color, caught, energyMix);
+
+      // Local diffusion is evaluated on surfaces, leaving the HTML text and empty sky crisp.
+      float pathClarity = 1.0 - smoothstep(0.4, 1.5, abs(vWorld.z));
+      float diffusion = (warmPool * 0.08 + amberPool * 0.14 + transmittedPool * 0.1) * (1.0 - pathClarity * 0.72);
+      color = mix(color, mix(uWarmLight, vec3(1.0), 0.76), diffusion);
+      // The floor warms with the sustained pace, before distance air.
+      color = floorWarmth(color, vWorld);
+      vec3 air = mix(uCoolLight, vec3(1.0), 0.88);
+      color = mix(color, air, haze);
+    }
     // Night: the same light model on the midnight palette. The key becomes a cool moon
     // that models the dunes from deep blue to cobalt and draws the satin sheen; the peach
     // pools stay the only warm light. Mixed by uNight, so a theme change crossfades.
@@ -171,9 +191,9 @@ export const landscapeFragment = /* glsl */ `
         + transmittedPool * ridgeCatch * pathLight * 0.14);
       night += uCoolLight * coolPool * slope * 0.04;
       night = mix(night, NIGHT_COBALT * 0.35, path * 0.2);
-      night = mix(night, caught, min(0.7, catchLight * opticalEnergy * (0.7 + uEnergy.y * 0.3 + uEnergy.z)));
+      night = mix(night, caught, energyMix);
       night = floorWarmth(night, vWorld);
-      night = mix(night, mix(uPage, NIGHT_COBALT, 0.12), distanceHaze(vWorld));
+      night = mix(night, mix(uPage, NIGHT_COBALT, 0.12), haze);
       color = mix(color, night, uNight);
     }
     // The big bang's wave front, lit like its core (genesisShaders.ts): a lavender haze,
@@ -188,7 +208,7 @@ export const landscapeFragment = /* glsl */ `
     gl_FragColor = vec4(color, 1.0);
     #include <tonemapping_fragment>
     // The world dissolves into the page (white by day, midnight blue by night).
-    gl_FragColor.rgb = mix(uPage, gl_FragColor.rgb, surfacePresence());
+    gl_FragColor.rgb = mix(uPage, gl_FragColor.rgb, presence);
     #include <colorspace_fragment>
   }
 `;

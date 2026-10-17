@@ -15,6 +15,7 @@ export const FLOOR_WARMTH = {
 export const floorWarmthField = /* glsl */ `
   vec3 floorWarmth(vec3 color, vec3 world) {
     float held = uEnergy.y;
+    if (held <= 0.0) return color;
     color *= mix(vec3(1.0), ${glslVec(FLOOR_WARMTH.grade)}, held);
     vec2 wake = (world.xz - ${glslVec(FLOOR_WARMTH.wakeCenter)}) / ${glslVec(FLOOR_WARMTH.wakeRadii)};
     float trail = exp(-dot(wake, wake)) * held * held * ${FLOOR_WARMTH.wakeStrength.toFixed(3)};
