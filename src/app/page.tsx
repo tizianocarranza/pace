@@ -7,6 +7,7 @@ import { Runner, type RunnerInput } from "@/components/runner/Runner";
 import { GenesisStage } from "@/components/runner/GenesisStage";
 import { CelestialToggle } from "@/components/CelestialToggle";
 import { ModePicker } from "@/components/ModePicker";
+import { TouchInput } from "@/components/typing/TouchInput";
 import { TypingText } from "@/components/typing/TypingText";
 import { WpmCounter } from "@/components/typing/WpmCounter";
 import { pickPrompt, promptsFor } from "@/data/prompts";
@@ -62,8 +63,9 @@ export default function Home() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // Space or Enter on a focused control presses it; it is not typing.
-      if (event.target instanceof Element && event.target.closest("button, a")) return;
+      // Space or Enter on a focused control presses it; it is not typing. The touch input
+      // forwards its own characters.
+      if (event.target instanceof Element && event.target.closest("button, a, input")) return;
       handleKey(event.key);
     };
 
@@ -97,7 +99,7 @@ export default function Home() {
   };
 
   return (
-    <main className="isolate grid min-h-screen grid-rows-[auto_1fr_1fr] bg-[var(--page)] px-12 py-8 text-[var(--ink)] transition-colors duration-[600ms] max-sm:px-6 max-sm:py-6">
+    <main className="isolate grid min-h-dvh grid-rows-[auto_1fr_1fr] bg-[var(--page)] px-12 py-8 text-[var(--ink)] transition-colors duration-[600ms] max-sm:px-6 max-sm:py-6">
       <GenesisStage />
       <CelestialToggle />
       <header data-genesis-reveal className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-sm:grid-cols-2 max-sm:gap-y-3">
@@ -116,16 +118,19 @@ export default function Home() {
 
       <section data-genesis-reveal className="flex items-center justify-center">
         {!showResults ? (
-          <TypingText
-            key={text}
-            text={text}
-            lang={prompt.mode.language}
-            currentIndex={currentIndex}
-            errorCount={errorCount}
-            status={status}
-            intensity={visualSpeed.intensity}
-            className="w-[min(48rem,80vw)] text-center text-[clamp(1.6rem,2.5vw,2.75rem)] leading-[1.3] font-normal tracking-[-0.035em]"
-          />
+          <div className="relative">
+            <TypingText
+              key={text}
+              text={text}
+              lang={prompt.mode.language}
+              currentIndex={currentIndex}
+              errorCount={errorCount}
+              status={status}
+              intensity={visualSpeed.intensity}
+              className="w-[min(48rem,80vw)] text-center text-[clamp(1.6rem,2.5vw,2.75rem)] leading-[1.3] font-normal tracking-[-0.035em]"
+            />
+            <TouchInput onKey={handleKey} active={status !== "finished"} idle={status === "idle"} />
+          </div>
         ) : (
           summary && <Results summary={summary} mode={prompt.mode} onTryAgain={handleTryAgain} />
         )}
