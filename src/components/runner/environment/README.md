@@ -6,8 +6,9 @@ The world is reduced to its essentials: the terrain, Pip (with his shadow and
 reflection) and the light trails. Everything else that used to be authored here
 was deleted in the unused-layer clean up (see "History" below).
 
-- **Draw budget.** About 16 draws and 92k triangles at idle, 18 draws while
-  running with ribbons (desktop, Study B). The terrain is 53,760 triangles.
+- **Draw budget.** 13 draws and 79k triangles at idle, 14 while running with
+  ribbons (desktop, Study B, day). The terrain is 53,760 triangles. Pip's
+  reflections draw both faces in one pass (`forceSinglePass`).
 - **Frame loop.** R3F renders automatically. Pip's controller runs at `-1`,
   `ReactiveEnvironment` at `-0.5` (`LandscapeMotion`, `WorldInteractions`,
   `WorldEnergy` and the shared uniforms), shadows and uploads at `0`.
@@ -116,6 +117,14 @@ was deleted in the unused-layer clean up (see "History" below).
   the finish collapse leaves them. Slot 0. Cost: +1 draw (2 triangles), only for the visible body.
 - **Traveling catch.** `energySweep` adds a narrow moving reflection inside the
   pools and one shelf caustic at z ≈ −1.85; it vanishes exactly at zero energy.
+- **Performance.** The terrain fragment shader returns the page color wherever
+  `surfacePresence()` is exactly zero (frame bands, sentence column, fades, unrevealed
+  genesis), skips the energy sweep while `uEnergy.x == 0` and the day palette at full
+  night; all three are pixel-identical. `SceneReady` (`Runner.tsx`) compiles hidden
+  objects too and draws one warm-up frame with everything shown while the canvas is still
+  transparent, because ANGLE/D3D11 finishes a program on its first draw (~70 ms). The WPM
+  orb paints its cloud filter once during loading for the same reason. Keep new hidden
+  meshes visible-able (no conditional mounting) so this warm-up covers them.
 
 To see the intro, use **Pace Debug → Replay intro**. `check-environment` asserts the
 big bang's timing, reveal coverage, frame-rate independence, replay and reduced motion.
@@ -123,7 +132,15 @@ big bang's timing, reveal coverage, frame-rate independence, replay and reduced 
 Verify: `node scripts/check-environment.mjs`, then with `npm run dev` running,
 `node scripts/review-composition.mjs --quick --wpm=90` and
 `--quick --mobile --wpm=90`. For the speed tiers, capture the ladder
-`--quick --wpm=15|30|45|60|90` and compare ribbon count and floor warmth.
+`--quick --wpm=15|30|45|60|90` and compare ribbon count and floor warmth. Add `--night`
+for the night theme.
+
+Performance: `node scripts/review-perf.mjs --gpu --no-sim` plays intro, idle, theme toggle,
+night, real typing and results on the machine's GPU and prints frame-time percentiles,
+hitches (> 20 ms, by frame index), a synchronous WebGL render time, draws and programs.
+`--dpr=2|3` raises fragment load; `--url=http://localhost:3001/` measures a production
+build (`next build && next start -p 3001`), which is what players get. Without `--gpu` it
+runs on SwiftShader, whose fixed per-frame cost hides shader changes.
 
 ## History
 
