@@ -5,6 +5,7 @@ import { useTypingEngine } from "@/hooks/useTypingEngine";
 import { Results } from "@/components/results/Results";
 import { Runner } from "@/components/runner/Runner";
 import { GenesisStage } from "@/components/runner/GenesisStage";
+import { CelestialToggle } from "@/components/CelestialToggle";
 import { TypingText } from "@/components/typing/TypingText";
 import { WpmCounter } from "@/components/typing/WpmCounter";
 import { getRandomPrompt, PROMPTS } from "@/data/prompts";
@@ -54,15 +55,16 @@ export default function Home() {
   };
 
   return (
-    <main className="isolate grid min-h-screen grid-rows-[auto_1fr_1fr] bg-white px-12 py-8 text-[#3d3a55] max-sm:px-6 max-sm:py-6">
+    <main className="isolate grid min-h-screen grid-rows-[auto_1fr_1fr] bg-[var(--page)] px-12 py-8 text-[var(--ink)] transition-colors duration-[600ms] max-sm:px-6 max-sm:py-6">
       <GenesisStage />
+      <CelestialToggle />
       <header data-genesis-reveal className="flex items-center justify-between">
         <span className="text-base font-medium tracking-[-0.04em]">pace.</span>
         <a
           href="https://github.com/tizianocarranza"
           target="_blank"
           rel="noreferrer"
-          className="text-xs tracking-[0.02em] text-[#a9a5c8] transition-colors duration-300 hover:text-[#3d3a55] focus-visible:text-[#3d3a55]"
+          className="text-xs tracking-[0.02em] text-[var(--muted)] transition-colors duration-300 hover:text-[var(--ink)] focus-visible:text-[var(--ink)]"
         >
           by Tiziano Carranza
         </a>

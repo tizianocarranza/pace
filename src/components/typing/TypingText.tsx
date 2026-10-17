@@ -2,8 +2,10 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { APPROVED_ERROR_STYLE, errorStyle } from "./errorStyle";
+import { APPROVED_TYPED_COLOR, typedColor } from "./typedColor";
 
 const approvedStyle = () => APPROVED_ERROR_STYLE;
+const approvedColor = () => APPROVED_TYPED_COLOR;
 
 type TypingTextProps = {
   text: string;
@@ -66,6 +68,8 @@ export function TypingText({ text, currentIndex, errorCount, status, intensity, 
   // Production always uses the approved style; Pace Debug switches it in development.
   const style = useSyncExternalStore(errorStyle.subscribe,
     process.env.NODE_ENV === "development" ? errorStyle.get : approvedStyle, approvedStyle);
+  const color = useSyncExternalStore(typedColor.subscribe,
+    process.env.NODE_ENV === "development" ? typedColor.get : approvedColor, approvedColor);
 
   // Remember where the latest mistake happened so only that letter flashes,
   // and only until the player gets past it. `missed` keeps every letter that was
@@ -202,6 +206,7 @@ export function TypingText({ text, currentIndex, errorCount, status, intensity, 
       ref={containerRef}
       aria-label={text}
       data-error-style={style}
+      data-typed-color={color}
       className={`typing-text relative whitespace-pre-wrap ${finished ? "text-exit" : ""} ${className ?? ""}`}
       style={{ "--caret-glow": intensity.toFixed(3) } as CSSProperties}
     >
@@ -237,6 +242,9 @@ export function TypingText({ text, currentIndex, errorCount, status, intensity, 
                   key={flash ? `${index}:${errorCount}` : index}
                   data-i={index}
                   className={`char relative inline-block ${state} ${flash ? "char-error" : ""} ${missed ? "char-missed" : ""}`}
+                  // The `gradient` typed color runs violet → cobalt along the prompt.
+                  style={color === "gradient"
+                    ? { "--t": (index / Math.max(1, text.length - 1)).toFixed(3) } as CSSProperties : undefined}
                 >
                   {char}
                 </span>

@@ -1,7 +1,9 @@
 "use client";
 
-import { useLayoutEffect } from "react";
+import { useFrame } from "@react-three/fiber";
+import { useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
+import { sceneTheme } from "./environment/sceneTheme";
 import { PIP_FLOOR_Y } from "./pipContacts";
 import { GROUND_Y } from "./environment/terrainProfile";
 
@@ -11,12 +13,27 @@ import { GROUND_Y } from "./environment/terrainProfile";
  * the camera ray onto the floor surface: the screen position is unchanged, but
  * the depth is the floor's. Pip and anything in front therefore occlude it
  * through the ordinary depth test; no stencil buffer is needed. */
-const REFLECTED: Record<string, { color: string; opacity: number }> = {
-  "Pip | Warm ivory matte": { color: "#cfcde6", opacity: 0.5 },
-  "Pip | Soft black eyes": { color: "#3d3a55", opacity: 0.4 },
+const REFLECTED: Record<string, { color: string; opacity: number; night: string; nightOpacity: number }> = {
+  // By day a pale lavender ghost on the pearl floor; by night a dim cobalt one.
+  "Pip | Warm ivory matte": { color: "#cfcde6", opacity: 0.5, night: "#3b4a92", nightOpacity: 0.42 },
+  "Pip | Soft black eyes": { color: "#3d3a55", opacity: 0.4, night: "#03050d", nightOpacity: 0.5 },
 };
+const THEMED = Object.fromEntries(Object.entries(REFLECTED).map(([name, style]) =>
+  [name, { day: new THREE.Color(style.color), night: new THREE.Color(style.night) }]));
 
 export function usePipReflection(scene: THREE.Group) {
+  const reflections = useRef<THREE.MeshBasicMaterial[]>([]);
+
+  // Slot 0, after NightMix (-0.75) has moved the night mix this frame.
+  useFrame(() => {
+    for (const reflected of reflections.current) {
+      const name = reflected.userData.source as string;
+      const style = REFLECTED[name];
+      reflected.color.lerpColors(THEMED[name].day, THEMED[name].night, sceneTheme.night);
+      reflected.opacity = THREE.MathUtils.lerp(style.opacity, style.nightOpacity, sceneTheme.night);
+    }
+  });
+
   useLayoutEffect(() => {
     const mirrors: { mirror: THREE.SkinnedMesh; parent: THREE.Object3D }[] = [];
     const materials = new Map<string, THREE.MeshBasicMaterial>();
@@ -26,6 +43,8 @@ export function usePipReflection(scene: THREE.Group) {
       const style = REFLECTED[name];
       reflected = new THREE.MeshBasicMaterial({ name: `${name} / reflection`, color: style.color,
         transparent: true, opacity: style.opacity, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+      reflected.userData.source = name;
+      reflections.current.push(reflected);
       reflected.onBeforeCompile = shader => {
         shader.vertexShader = "varying float vMirrorDepth;\n" + shader.vertexShader.replace("#include <project_vertex>", `
           vec4 mirrorWorld = modelMatrix * vec4(transformed, 1.0);
@@ -69,6 +88,7 @@ export function usePipReflection(scene: THREE.Group) {
     mirrors.forEach(({ mirror, parent }) => parent.add(mirror));
 
     return () => {
+      reflections.current = [];
       mirrors.forEach(({ mirror }) => mirror.removeFromParent());
       materials.forEach(reflected => reflected.dispose());
     };

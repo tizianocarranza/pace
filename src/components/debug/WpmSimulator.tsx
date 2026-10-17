@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { ERROR_STYLES, errorStyle, type ErrorStyle } from "@/components/typing/errorStyle";
+import { TYPED_COLORS, typedColor, type TypedColor } from "@/components/typing/typedColor";
 import OrbDebugger from "./OrbDebugger";
 
 /** Imported only by the development build. No typing-engine state is writable here. */
@@ -16,6 +17,7 @@ export default function WpmSimulator({ value, onChange, finished, idle, onReplay
 }) {
   const [wpm, setWpm] = useState(30);
   const highlight = useSyncExternalStore(errorStyle.subscribe, errorStyle.get, errorStyle.get);
+  const typed = useSyncExternalStore(typedColor.subscribe, typedColor.get, typedColor.get);
   const enabled = value !== null;
   const update = (next: number) => {
     setWpm(next);
@@ -52,6 +54,13 @@ export default function WpmSimulator({ value, onChange, finished, idle, onReplay
           <select value={highlight} onChange={event => errorStyle.set(event.target.value as ErrorStyle)}
             className="rounded border border-neutral-200 bg-white px-1 py-0.5">
             {ERROR_STYLES.map(style => <option key={style} value={style}>{style}</option>)}
+          </select>
+        </label>
+        <label className="mt-2 flex items-center justify-between gap-2">
+          Typed color
+          <select value={typed} onChange={event => typedColor.set(event.target.value as TypedColor)}
+            className="rounded border border-neutral-200 bg-white px-1 py-0.5">
+            {TYPED_COLORS.map(color => <option key={color} value={color}>{color}</option>)}
           </select>
         </label>
         <OrbDebugger />

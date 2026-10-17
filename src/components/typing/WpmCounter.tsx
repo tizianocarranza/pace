@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
-import { orbTuning } from "./orbTuning";
+import { ORB_NIGHT_COLORS, orbTuning } from "./orbTuning";
+import { theme } from "@/lib/theme";
 import { quicksand } from "@/lib/fonts";
 import { FLOOR_WARMTH } from "@/components/runner/environment/floorWarmth";
 import { worldTone } from "@/components/runner/environment/worldTone";
@@ -284,6 +285,8 @@ export function WpmCounter({ wpm, intensity, className }: WpmCounterProps) {
 
   // Production never changes the tuning; the development Orb debugger does.
   const tuning = useSyncExternalStore(orbTuning.subscribe, orbTuning.get, orbTuning.get);
+  const night = useSyncExternalStore(theme.subscribe, () => theme.get() === "night", () => false);
+  const palette = night ? ORB_NIGHT_COLORS : tuning;
   const target = tuning.previewLevel ?? intensity;
 
   useLayoutEffect(() => {
@@ -332,14 +335,14 @@ export function WpmCounter({ wpm, intensity, className }: WpmCounterProps) {
             </clipPath>
             {/* No outline: the sphere is a faint lavender edge feathering into clear glass. */}
             <radialGradient id={glass} cx="50" cy="50" r={RADIUS} gradientUnits="userSpaceOnUse">
-              <stop offset="0.55" stopColor="#c9c5e3" stopOpacity="0" />
-              <stop offset="1" stopColor="#c9c5e3" stopOpacity={tuning.glassEdge} />
+              <stop offset="0.55" style={{ stopColor: "var(--pending)" }} stopOpacity="0" />
+              <stop offset="1" style={{ stopColor: "var(--pending)" }} stopOpacity={tuning.glassEdge} />
             </radialGradient>
             {/* Pale, airy palette in each layer's own space: near-white lavender on top. */}
             <linearGradient id={tint} gradientUnits="userSpaceOnUse" x1="0" y1="-12" x2="0" y2="90">
-              <stop offset="0" style={{ stopColor: toward(tuning.colorTop, tuning.warmthStrength) }} />
-              <stop offset="0.45" style={{ stopColor: toward(tuning.colorMid, tuning.warmthStrength) }} />
-              <stop offset="1" style={{ stopColor: toward(tuning.colorBottom, tuning.warmthStrength) }} />
+              <stop offset="0" style={{ stopColor: toward(palette.colorTop, tuning.warmthStrength) }} />
+              <stop offset="0.45" style={{ stopColor: toward(palette.colorMid, tuning.warmthStrength) }} />
+              <stop offset="1" style={{ stopColor: toward(palette.colorBottom, tuning.warmthStrength) }} />
             </linearGradient>
             {/* Fixed in the orb's space, so drifting puffs keep reshaping the displaced
                 edge; the noise itself morphs slowly. Alpha is modulated by the same noise
@@ -396,7 +399,7 @@ export function WpmCounter({ wpm, intensity, className }: WpmCounterProps) {
         </span>
       </div>
 
-      <span className="text-[10px] leading-none tracking-[0.2em] text-[#a9a5c8]">
+      <span className="text-[10px] leading-none tracking-[0.2em] text-[var(--muted)]">
         WPM
       </span>
     </div>

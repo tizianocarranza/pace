@@ -14,6 +14,7 @@ import { LightTrails } from "./LightTrails";
 import { GenesisCore } from "./GenesisCore";
 import { WorldGenesis } from "./worldGenesis";
 import { genesisStage } from "./genesisStage";
+import { PAGE_COLOR, sceneTheme } from "./sceneTheme";
 
 /** The big bang's core (Pip's spot, body height), projected for the page each frame. */
 const genesisCore = new THREE.Vector3();
@@ -60,6 +61,8 @@ export function ReactiveEnvironment({ motion, status }: {
       live.uEnergyTier.value = energy.tier;
       live.uTrailTravel.value = energy.trailDistance;
       live.uGenesis.value.copy(genesis.value);
+      live.uNight.value = sceneTheme.night;
+      live.uPage.value.lerpColors(PAGE_COLOR.day, PAGE_COLOR.night, sceneTheme.night);
       worldTone.publish(energy.value.y);
       updateLightingUniforms(live as ReturnType<typeof createLightingUniforms>, world);
       const dpr = gl.getPixelRatio();

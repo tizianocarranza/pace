@@ -7,6 +7,8 @@ import { Pip } from "./Pip";
 import { EnvironmentLighting } from "./environment/EnvironmentLighting";
 import { frameComposition } from "./composition";
 import { StudioEnvironment } from "./environment/StudioEnvironment";
+import { NightMix } from "./environment/NightMix";
+import { SkyBodies } from "./environment/SkyBodies";
 
 type RunnerProps = {
   intensity: number;
@@ -88,6 +90,8 @@ export function Runner({
         >
           <StudioFraming />
           <StudioEnvironment />
+          <NightMix />
+          <SkyBodies />
           <EnvironmentLighting />
 
           <Pip

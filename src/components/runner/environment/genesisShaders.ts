@@ -23,6 +23,7 @@ export const genesisFragment = /* glsl */ `
   uniform vec3 uPearl;
   uniform vec3 uViolet;
   uniform vec3 uWarm;
+  uniform float uNight;
   void main() {
     vec2 q = gl_PointCoord * 2.0 - 1.0;
     float d = dot(q, q);
@@ -38,7 +39,8 @@ export const genesisFragment = /* glsl */ `
     float glint = exp(-a.x * 22.0) * exp(-a.y * 3.0) + exp(-a.y * 22.0) * exp(-a.x * 3.0);
     color = mix(color, mix(uPearl, uViolet, 0.25), glint * (1.0 - hot));
     float alpha = max(exp(-d * 3.4) * 0.95, glint * 0.8);
-    gl_FragColor = vec4(color, alpha * min(1.0, uGenesis.y * 1.5));
+    // On the dark page the halo is the light itself: a little more of it.
+    gl_FragColor = vec4(color, min(1.0, alpha * (1.0 + uNight * 0.25)) * min(1.0, uGenesis.y * 1.5));
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }

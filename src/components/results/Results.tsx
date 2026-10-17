@@ -29,7 +29,7 @@ function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <span className={`${quicksand.className} text-lg tabular-nums max-sm:text-base`}>{value}</span>
-      <span className="text-xs text-[#a9a5c8] max-sm:text-[10px]">{label}</span>
+      <span className="text-xs text-[var(--muted)] max-sm:text-[10px]">{label}</span>
     </div>
   );
 }
@@ -46,7 +46,7 @@ export function Results({ summary, onTryAgain }: ResultsProps) {
     <div className="flex w-[min(28rem,84vw)] flex-col items-center">
       <div className="results-enter flex flex-col items-center" style={enter(0)}>
         <div className={`${quicksand.className} text-6xl leading-none tabular-nums max-sm:text-5xl`}>{summary.wpm}</div>
-        <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[#a9a5c8]">wpm</div>
+        <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">wpm</div>
       </div>
 
       <div className="results-enter mt-7 w-full max-sm:mt-4" style={enter(1)}>
@@ -61,7 +61,7 @@ export function Results({ summary, onTryAgain }: ResultsProps) {
       </div>
 
       {progress && (
-        <div className="results-enter mt-7 flex items-center gap-4 text-xs text-[#a9a5c8] max-sm:mt-4" style={enter(3)}>
+        <div className="results-enter mt-7 flex items-center gap-4 text-xs text-[var(--muted)] max-sm:mt-4" style={enter(3)}>
           {progress.previousBest === null ? (
             <span>first run saved</span>
           ) : (
@@ -81,7 +81,7 @@ export function Results({ summary, onTryAgain }: ResultsProps) {
               className="flex h-4 items-end gap-[3px]">
               {history.map((run, index) => (
                 <span key={run.at}
-                  className={`w-[3px] rounded-full ${index === history.length - 1 ? "results-history-current" : "bg-[#dcd8f0]"}`}
+                  className={`w-[3px] rounded-full ${index === history.length - 1 ? "results-history-current" : "bg-[var(--track)]"}`}
                   style={{ height: `${Math.max(18, (run.wpm / historyTop) * 100)}%` }} />
               ))}
             </span>

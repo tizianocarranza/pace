@@ -17,6 +17,9 @@ Stack: Next 16 (App Router, read AGENTS.md), React 19, @react-three/fiber 9,
 - `src/components/results/` — results screen (chart, stats); `src/lib/runHistory.ts` keeps
   past runs in `localStorage` for best/average/history.
 - `src/lib/visualSpeed.ts` — the single WPM → visual intensity curve.
+- `src/lib/theme.ts` — day/night theme on `<html data-theme>` (head script); toggled by
+  clicking the sun/moon in the sky (`CelestialToggle` over `environment/SkyBodies`); the
+  world follows it through `environment/sceneTheme.ts`.
 - `src/components/runner/` — Canvas, Pip, motion controller, contacts, shadow, reflection.
 - `src/components/runner/environment/` — landscape, shaders, materials, world motion/energy.
 - `src/components/debug/` — development-only WPM simulator.
