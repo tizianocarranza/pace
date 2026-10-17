@@ -1,20 +1,21 @@
 "use client";
 
 import { Canvas, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { memo, type RefObject, useCallback, useEffect, useLayoutEffect, useState } from "react";
 import * as THREE from "three";
 import { Pip } from "./Pip";
+import { type PipInput } from "./usePipMotion";
 import { EnvironmentLighting } from "./environment/EnvironmentLighting";
 import { frameComposition } from "./composition";
 import { StudioEnvironment } from "./environment/StudioEnvironment";
 import { NightMix } from "./environment/NightMix";
 import { SkyBodies } from "./environment/SkyBodies";
 
+export type RunnerInput = PipInput;
+
 type RunnerProps = {
-  intensity: number;
-  sustainedInput?: boolean;
-  lastCorrectAt: number | null;
-  errorCount: number;
+  /** Live typing values, read every frame (never a reason to re-render the scene). */
+  input: RefObject<RunnerInput>;
   status: "idle" | "running" | "finished";
   onFinishExit?: () => void;
   className?: string;
@@ -82,11 +83,12 @@ function SceneReady({ onReady }: { onReady: () => void }) {
   return null;
 }
 
-export function Runner({
-  intensity,
-  sustainedInput = false,
-  lastCorrectAt,
-  errorCount,
+const CAMERA = { position: [0, 1.2, 6] as const, fov: 30 };
+const aim = ({ camera }: { camera: THREE.Camera }) => camera.lookAt(0, 0, 0);
+
+/** Memoized: with the live values in `input`, it renders only when the run status changes. */
+export const Runner = memo(function Runner({
+  input,
   status,
   onFinishExit,
   className,
@@ -101,15 +103,7 @@ export function Runner({
         className={`pointer-events-none fixed inset-0 -z-10 transition-opacity duration-700 ease-(--ease-out) ${
           ready ? "opacity-100" : "opacity-0"}`}
       >
-        <Canvas
-          camera={{
-            position: [0, 1.2, 6],
-            fov: 30,
-          }}
-          onCreated={({ camera }) => {
-            camera.lookAt(0, 0, 0);
-          }}
-        >
+        <Canvas camera={CAMERA} onCreated={aim}>
           <StudioFraming />
           <StudioEnvironment />
           <NightMix />
@@ -117,10 +111,7 @@ export function Runner({
           <EnvironmentLighting />
 
           <Pip
-            intensity={intensity}
-            sustainedInput={sustainedInput}
-            lastCorrectAt={lastCorrectAt}
-            errorCount={errorCount}
+            input={input}
             status={status}
             onFinishExit={onFinishExit}
             arrive={ready}
@@ -131,4 +122,4 @@ export function Runner({
       </div>
     </div>
   );
-}
+});

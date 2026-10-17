@@ -8,16 +8,22 @@ import { PipMotion, type PipMotionSignals, type PipStatus } from "./pipMotion";
 
 export type PipMotionRef = RefObject<PipMotionSignals | null>;
 
+/** Live typing input. The page writes it after each render and Pip's frame loop reads it,
+ * so keystrokes and the live WPM tick never re-render the 3D tree. */
+export type PipInput = {
+  intensity: number;
+  sustainedInput: boolean;
+  lastCorrectAt: number | null;
+  errorCount: number;
+};
+
 export function usePipMotion(
   model: THREE.Group,
   placement: RefObject<THREE.Group | null>,
   clips: THREE.AnimationClip[],
-  intensity: number,
-  lastCorrectAt: number | null,
-  errorCount: number,
+  input: RefObject<PipInput>,
   status: PipStatus,
   onFinishExit?: () => void,
-  sustainedInput = false,
   face?: PipFace,
   arrive = false,
   introReplay = 0,
@@ -60,6 +66,7 @@ export function usePipMotion(
   // Explicit order: animation/pose -> sole samples -> shadow and environment.
   // Negative priority preserves R3F's automatic rendering.
   useFrame((state, delta) => {
+    const { intensity, lastCorrectAt, errorCount, sustainedInput } = input.current;
     const finished = controller.current?.update(
       delta, intensity, lastCorrectAt, errorCount, status, Date.now(), state.camera,
       // R3F's viewport estimate ignores camera view offsets. Read the horizontal

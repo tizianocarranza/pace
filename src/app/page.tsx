@@ -1,9 +1,9 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTypingEngine } from "@/hooks/useTypingEngine";
 import { Results } from "@/components/results/Results";
-import { Runner } from "@/components/runner/Runner";
+import { Runner, type RunnerInput } from "@/components/runner/Runner";
 import { GenesisStage } from "@/components/runner/GenesisStage";
 import { CelestialToggle } from "@/components/CelestialToggle";
 import { TypingText } from "@/components/typing/TypingText";
@@ -35,6 +35,17 @@ export default function Home() {
 
   const visualSpeed = resolveVisualSpeed(currentWpm, status,
     process.env.NODE_ENV === "development" ? simulatedWpm : null);
+
+  // Read by Pip's frame loop: keystrokes update the scene without re-rendering it.
+  const runnerInput = useRef<RunnerInput>({ intensity: 0, sustainedInput: false, lastCorrectAt: null, errorCount: 0 });
+  useLayoutEffect(() => {
+    const input = runnerInput.current;
+    input.intensity = visualSpeed.intensity;
+    input.sustainedInput = visualSpeed.sustainedInput;
+    input.lastCorrectAt = lastCorrectAt;
+    input.errorCount = errorCount;
+  });
+  const handleFinishExit = useCallback(() => setShowResults(true), []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -88,12 +99,9 @@ export default function Home() {
 
       <section className="flex flex-col items-center justify-center gap-6">
         <Runner
-          intensity={visualSpeed.intensity}
-          sustainedInput={visualSpeed.sustainedInput}
-          lastCorrectAt={lastCorrectAt}
-          errorCount={errorCount}
+          input={runnerInput}
           status={visualSpeed.status}
-          onFinishExit={() => setShowResults(true)}
+          onFinishExit={handleFinishExit}
           introReplay={process.env.NODE_ENV === "development" ? introReplay : 0}
           className="h-48 w-screen"
         />
