@@ -22,6 +22,8 @@ Stack: Next 16 (App Router, read AGENTS.md), React 19, @react-three/fiber 9,
 - `src/app/r/[result]/` — share page for a result encoded in the path
   (`src/lib/shareResult.ts`); `src/app/_og/card.tsx` draws the share cards (site and
   result) with TTF copies of the UI fonts and a crop of the world (`_og/world.jpg`).
+- `src/app/icon.svg` — the logo (Pip's face on the caret gradient); `favicon.ico` and
+  `apple-icon.png` are generated from it with `node scripts/build-icons.mjs`.
 - Package manager is pnpm (`pnpm-lock.yaml`).
 - `src/lib/visualSpeed.ts` — the single WPM → visual intensity curve.
 - `src/lib/theme.ts` — day/night theme on `<html data-theme>` (head script); toggled by
