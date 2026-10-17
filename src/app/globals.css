@@ -5,6 +5,12 @@ body {
   margin: 0;
 }
 
+/* The page behind everything, so overscroll and the canvas edges match the theme. */
+body {
+  background: var(--page);
+  transition: background-color 600ms var(--ease-out);
+}
+
 @keyframes results-enter {
   from {
     opacity: 0;
@@ -64,13 +70,42 @@ body {
 }
 
 :root {
-  /* Drawn from the world: Pip's eyes, the pearl haze, violet → blue light, warm peach. */
+  /* Day, drawn from the world: Pip's eyes, the pearl haze, violet → blue light, warm peach. */
+  color-scheme: light;
+  --page: #ffffff;
   --ink: #3d3a55;
+  --muted: #a9a5c8;
   --pending: #c9c5e3;
+  --track: #dcd8f0;
   --miss: #f0906a;
   --caret-from: #a493f2;
   --caret-to: #4a74e6;
+  --typed-indigo: #5a4fa8;
+  --typed-violet: #6f5ee0;
+  --typed-cobalt: #3f66d8;
+  --typed-from: #7a68e6;
+  --typed-to: #3f66d8;
+  --orb-digit-empty: #b3acdf;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Night, midnight blue: light text on a near-black blue, the world lit by a cool moon. */
+html[data-theme="night"] {
+  color-scheme: dark;
+  --page: #0b1024;
+  --ink: #e6e9ff;
+  --muted: #7d86b8;
+  --pending: #353d6b;
+  --track: #262d58;
+  --miss: #ff9d76;
+  --caret-from: #b9a9ff;
+  --caret-to: #7c9cff;
+  --typed-indigo: #b3a9ef;
+  --typed-violet: #b6a8ff;
+  --typed-cobalt: #8fadff;
+  --typed-from: #b6a8ff;
+  --typed-to: #7fa0ff;
+  --orb-digit-empty: #5c6699;
 }
 
 /* Typing prompt */
@@ -92,8 +127,29 @@ body {
   color: var(--pending);
 }
 
+/* Typed letters (typedColor.ts, switched in Pace Debug). --t runs 0 → 1 along the prompt. */
+.char {
+  --typed: var(--ink);
+}
+
+[data-typed-color="indigo"] .char {
+  --typed: var(--typed-indigo);
+}
+
+[data-typed-color="violet"] .char {
+  --typed: var(--typed-violet);
+}
+
+[data-typed-color="cobalt"] .char {
+  --typed: var(--typed-cobalt);
+}
+
+[data-typed-color="gradient"] .char {
+  --typed: color-mix(in oklab, var(--typed-from), var(--typed-to) calc(var(--t, 0) * 100%));
+}
+
 .char-typed {
-  color: var(--ink);
+  color: var(--typed);
   animation: char-settle 450ms ease-out backwards;
 }
 
@@ -108,7 +164,7 @@ body {
   }
 
   to {
-    color: var(--ink);
+    color: var(--typed);
   }
 }
 
@@ -238,7 +294,7 @@ body {
   font-size: 1.6rem;
   font-weight: 500;
   line-height: var(--orb-digit-h);
-  color: color-mix(in oklab, #b3acdf, #fdfcff calc(min(1, var(--wpm-fill, 0) * 2.5) * 100%));
+  color: color-mix(in oklab, var(--orb-digit-empty), #fdfcff calc(min(1, var(--wpm-fill, 0) * 2.5) * 100%));
   text-shadow: 0 0 calc(var(--orb-number-glow, 1) * 7px)
     color-mix(in oklab, rgb(150 132 236 / 0.55), rgb(240 140 90 / 0.55) calc(var(--orb-warmth, 0) * 70%));
 }
@@ -329,6 +385,34 @@ html[data-genesis="playing"] [data-genesis-reveal] {
   html[data-genesis] [data-genesis-reveal] {
     opacity: 1;
     mask-image: none;
+  }
+}
+
+/* The theme toggle: an invisible button over the sun or moon drawn in the sky (SkyBodies).
+   Its anchor comes from celestial.ts through the inline custom properties. */
+.celestial-toggle {
+  position: fixed;
+  z-index: 20;
+  top: calc(var(--celestial-top) - var(--celestial-hit) / 2);
+  right: calc(var(--celestial-right) - var(--celestial-hit) / 2);
+  width: var(--celestial-hit);
+  height: var(--celestial-hit);
+  border-radius: 9999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.celestial-toggle:focus-visible {
+  outline: 1.5px solid color-mix(in srgb, var(--muted) 70%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .celestial-toggle {
+    top: calc(var(--celestial-top-compact) - var(--celestial-hit-compact) / 2);
+    right: calc(var(--celestial-right-compact) - var(--celestial-hit-compact) / 2);
+    width: var(--celestial-hit-compact);
+    height: var(--celestial-hit-compact);
   }
 }
 

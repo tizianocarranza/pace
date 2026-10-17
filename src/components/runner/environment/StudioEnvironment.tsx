@@ -7,6 +7,7 @@
 import { useLayoutEffect } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { ENVIRONMENT_INTENSITY, PAGE_COLOR } from "./sceneTheme";
 
 /** Linear HDR studio illumination; no downloaded HDRI and no visible sky geometry. */
 function createStudioTexture() {
@@ -61,8 +62,9 @@ export function StudioEnvironment() {
     target.texture.name = "Pace / studio PMREM";
     source.dispose(); generator.dispose();
     scene.environment = target.texture;
-    scene.environmentIntensity = 0.8;
-    scene.background = new THREE.Color("white");
+    // Day values; NightMix blends both toward night every frame.
+    scene.environmentIntensity = ENVIRONMENT_INTENSITY.day;
+    scene.background = PAGE_COLOR.day.clone();
     gl.outputColorSpace = THREE.SRGBColorSpace;
     // Neutral keeps white at white and preserves accent hue; ACES greyed the
     // high-key field and desaturated the cobalt/peach accents.

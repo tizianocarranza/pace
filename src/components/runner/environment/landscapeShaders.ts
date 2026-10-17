@@ -4,6 +4,13 @@ import { energyField } from "./worldEnergy";
 import { atmosphereField } from "./atmosphere";
 import { floorWarmthField } from "./floorWarmth";
 import { genesisField } from "./worldGenesis";
+import { Color } from "three";
+
+/** A linear GLSL constant from an sRGB hex (three's color management converts it). */
+const glsl = (hex: string) => {
+  const { r, g, b } = new Color(hex);
+  return `vec3(${r.toFixed(4)}, ${g.toFixed(4)}, ${b.toFixed(4)})`;
+};
 
 export const landscapeVertex = /* glsl */ `
   uniform float uTravel;
@@ -47,8 +54,14 @@ export const landscapeFragment = /* glsl */ `
   uniform vec3 uTransmittedPool;
   uniform float uVisibility;
   uniform vec2 uResolution;
+  uniform float uNight;
+  uniform vec3 uPage;
   varying vec3 vWorld;
   varying vec3 vNormal;
+  // Midnight palette: deep blue valleys, cobalt slopes, a cool moon.
+  const vec3 NIGHT_DEEP = ${glsl("#111a3f")};
+  const vec3 NIGHT_COBALT = ${glsl("#2b4bb8")};
+  const vec3 NIGHT_MOON = ${glsl("#a9bbff")};
   ${energyField}
   ${floorWarmthField}
   ${atmosphereField}
@@ -147,9 +160,26 @@ export const landscapeFragment = /* glsl */ `
     color = floorWarmth(color, vWorld);
     vec3 air = mix(uCoolLight, vec3(1.0), 0.88);
     color = mix(color, air, distanceHaze(vWorld));
+    // Night: the same light model on the midnight palette. The key becomes a cool moon
+    // that models the dunes from deep blue to cobalt and draws the satin sheen; the peach
+    // pools stay the only warm light. Mixed by uNight, so a theme change crossfades.
+    if (uNight > 0.0) {
+      vec3 night = mix(NIGHT_DEEP, NIGHT_COBALT, 0.04 + 0.42 * pow(light, 2.6));
+      night = mix(night, uViolet * 0.22, slope * 0.25 * (1.0 - pearlShift));
+      night += NIGHT_MOON * (lobe * (0.2 + fresnel * 0.34) + crest * 0.035 + fresnel * 0.03);
+      night += uWarmLight * (warmPool * (0.05 + ridgeCatch * 0.16) + amberPool * 0.05
+        + transmittedPool * ridgeCatch * pathLight * 0.14);
+      night += uCoolLight * coolPool * slope * 0.04;
+      night = mix(night, NIGHT_COBALT * 0.35, path * 0.2);
+      night = mix(night, caught, min(0.7, catchLight * opticalEnergy * (0.7 + uEnergy.y * 0.3 + uEnergy.z)));
+      night = floorWarmth(night, vWorld);
+      night = mix(night, mix(uPage, NIGHT_COBALT, 0.12), distanceHaze(vWorld));
+      color = mix(color, night, uNight);
+    }
     // The big bang's wave front, lit like its core (genesisShaders.ts): a lavender haze,
     // a pale peach band inside it and a near-white hot line at the crest.
-    float front = genesisFront(vWorld);
+    // On the dark floor a pale band reads far brighter: softer at night.
+    float front = genesisFront(vWorld) * mix(1.0, 0.55, uNight);
     if (front > 0.0) {
       color = mix(color, mix(uViolet, uPearl, 0.3), min(0.8, front));
       color = mix(color, mix(uWarm, uPearl, 0.5), front * front * 0.9);
@@ -157,7 +187,8 @@ export const landscapeFragment = /* glsl */ `
     }
     gl_FragColor = vec4(color, 1.0);
     #include <tonemapping_fragment>
-    gl_FragColor.rgb = mix(vec3(1.0), gl_FragColor.rgb, surfacePresence());
+    // The world dissolves into the page (white by day, midnight blue by night).
+    gl_FragColor.rgb = mix(uPage, gl_FragColor.rgb, surfacePresence());
     #include <colorspace_fragment>
   }
 `;

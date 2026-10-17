@@ -27,6 +27,11 @@ and temporarily suspends the simulator. Real typing still works while it is enab
 letter), `haze` (a peach glow behind the letter), `word` (a wash over the
 whole word), `caret` (only the caret glows) or `dip` (the letter sinks a hair). Production always uses `APPROVED_ERROR_STYLE` (currently `caret`), and a reload starts from it.
 
+**Typed color** switches the color of correctly typed letters (`typedColor.ts`): `ink`
+(the original near-black), `indigo`, `violet`, `cobalt` or `gradient` (violet to
+cobalt along the prompt). Production always uses `APPROVED_TYPED_COLOR` (currently
+`gradient`).
+
 **Replay intro** (only before the first key) runs the intro again: the world fades in
 from white and Pip runs in from the left. Production always passes `introReplay={0}`.
 

@@ -47,6 +47,10 @@ export type OrbTuning = {
   replay: number;
 };
 
+/** The cloud at night: on the midnight page it glows a moonlit lavender-blue instead of
+ * the day's near-white. The Orb debugger tunes the day palette. */
+export const ORB_NIGHT_COLORS = { colorTop: "#cbc8ff", colorMid: "#9ea8f6", colorBottom: "#6f82e6" } as const;
+
 export const ORB_DEFAULTS: OrbTuning = {
   numberOmega: 5,
   numberFadeMs: 320,

@@ -96,6 +96,24 @@ was deleted in the unused-layer clean up (see "History" below).
   state: each `[data-genesis-reveal]` element (header, prompt/results, WPM counter) is
   uncovered by a radial mask as the wave crosses it; nothing is drawn in the sky. The UI starts hidden
   from SSR; if no arrival comes within 6 s it shows anyway. Reduced motion shows it at once.
+- **Day and night.** The page theme (`src/lib/theme.ts`, `<html data-theme>`, toggled in
+  the header) has a world counterpart: `NightMix` damps `sceneTheme.night` (0 → 1) toward it
+  at frame slot −0.75, so switching crossfades in ~0.6 s (instantly under reduced motion).
+  The world reads it the same frame: `uNight` and `uPage` (the page color the ground
+  dissolves into, also `scene.background`) at −0.5; Pip's lights, emissive lift, reflection
+  and contact shadow at 0. At night the ground keeps the same light model on a midnight
+  palette (deep blue → cobalt by the key, now a cool moon, with a moonlit satin sheen); the
+  peach pools stay the only warm light, the ribbons brighten, the core's halo grows and the
+  big bang's front softens. The studio IBL drops to 0.26. No new draws or triangles.
+- **Sun and moon (the theme toggle).** `SkyBodies` draws a sun by day and a crescent moon
+  by night high on the right; `CelestialToggle` is an invisible button over them. One anchor
+  in `celestial.ts` (CSS px from the top-right) places both. The bodies are screen-space quads
+  (`celestialShaders.ts`), so they never depend on the camera framing; `depthTest` off,
+  render order `sky`. Switching sets one body along an arc down and out while the other
+  rises, on its own damped swap (~1.1 s, instant under reduced motion). Their halo grows with
+  the floor's sustained warmth (`worldTone`) and with hover/focus (`celestialHover`). They
+  are hidden until the first arrival and appear as the big bang's page wave reaches them;
+  the finish collapse leaves them. Slot 0. Cost: +1 draw (2 triangles), only for the visible body.
 - **Traveling catch.** `energySweep` adds a narrow moving reflection inside the
   pools and one shelf caustic at z ≈ −1.85; it vanishes exactly at zero energy.
 

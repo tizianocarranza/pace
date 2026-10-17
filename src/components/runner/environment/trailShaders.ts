@@ -94,6 +94,7 @@ export const trailVertex = /* glsl */ `
 export const trailFragment = /* glsl */ `
   uniform float uVisibility;
   uniform vec2 uResolution;
+  uniform float uNight;
   uniform vec3 uWarm;
   uniform vec3 uBlue;
   uniform vec3 uViolet;
@@ -118,6 +119,8 @@ export const trailFragment = /* glsl */ `
     vec3 color = mix(tint, uViolet * 0.85, smoothstep(0.3, 1.0, vUv.x) * 0.5);
     color += tint * rim * 0.8;
     color *= 0.9 + 0.3 * uEnergy.y;
+    // On the midnight floor the ribbons are light on dark: brighter.
+    color *= 1.0 + uNight * 0.85;
     float alpha = min(1.0, body * 0.68 + rim * 0.6) * along;
     vec2 screen = gl_FragCoord.xy / uResolution;
     float frame = smoothstep(0.12, 0.24, screen.y) * (1.0 - smoothstep(0.66, 0.76, screen.y));

@@ -5,6 +5,11 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { PIP_FLOOR_Y } from "./pipContacts";
 import { type PipMotionRef } from "./usePipMotion";
+import { lerpTheme } from "./environment/sceneTheme";
+
+/** A warm grey on the pale floor; near-black blue on the midnight one. */
+const SHADOW_DAY = new THREE.Color("#77736f");
+const SHADOW_NIGHT = new THREE.Color("#01030a");
 
 const vertexShader = /* glsl */ `
   varying vec3 vWorld;
@@ -49,7 +54,7 @@ export function PipShadow({ motion }: { motion: PipMotionRef }) {
   const uniforms = useMemo(() => ({
     uLeft: { value: new THREE.Vector3() },
     uRight: { value: new THREE.Vector3() },
-    uColor: { value: new THREE.Color("#77736f") },
+    uColor: { value: SHADOW_DAY.clone() },
   }), []);
 
   useFrame(() => {
@@ -59,6 +64,7 @@ export function PipShadow({ motion }: { motion: PipMotionRef }) {
     if (!contacts?.ready) return;
     const [left, right] = contacts.feet;
     const live = material.current.uniforms;
+    lerpTheme(live.uColor.value, SHADOW_DAY, SHADOW_NIGHT);
     live.uLeft.value.set(left.point.x, left.point.z, left.height);
     live.uRight.value.set(right.point.x, right.point.z, right.height);
     shadow.current.position.set(

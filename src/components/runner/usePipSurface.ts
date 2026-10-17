@@ -1,11 +1,25 @@
 "use client";
 
-import { useLayoutEffect } from "react";
+import { useFrame } from "@react-three/fiber";
+import { useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { type PipFace } from "./pipFace";
+import { sceneTheme } from "./environment/sceneTheme";
+
+/** The lavender lift that keeps the body's shadows from sinking to grey; under the moon
+ * it mostly goes, or Pip would glow on the dark floor. */
+const BODY_LIFT = { day: 0.2, night: 0.05 };
 
 /** A small surface adjustment; the cached GLB's materials stay reusable. */
 export function usePipSurface(scene: THREE.Group, face: PipFace) {
+  const bodies = useRef<THREE.MeshPhysicalMaterial[]>([]);
+
+  // Slot 0, after NightMix (-0.75) has moved the night mix this frame.
+  useFrame(() => {
+    const lift = THREE.MathUtils.lerp(BODY_LIFT.day, BODY_LIFT.night, sceneTheme.night);
+    for (const body of bodies.current) body.emissiveIntensity = lift;
+  });
+
   useLayoutEffect(() => {
     const originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
     const surfaces = new Map<THREE.Material, THREE.MeshPhysicalMaterial>();
@@ -27,7 +41,8 @@ export function usePipSurface(scene: THREE.Group, face: PipFace) {
           // Soft vinyl scatters light inside, so its shadows never sink to grey.
           // A faint lavender lift stands in for that (and the world's bounce).
           surface.emissive.set("#ebe8f7");
-          surface.emissiveIntensity = 0.2;
+          surface.emissiveIntensity = BODY_LIFT.day;
+          bodies.current.push(surface);
           surface.roughness = 0.76;
           surface.ior = 1.46;
           surface.specularIntensity = 0.48;
@@ -91,6 +106,7 @@ export function usePipSurface(scene: THREE.Group, face: PipFace) {
     });
 
     return () => {
+      bodies.current = [];
       for (const [mesh, material] of originals) mesh.material = material;
       for (const material of surfaces.values()) material.dispose();
       // The geometry belongs to the cached GLB; leave it as it was loaded.
