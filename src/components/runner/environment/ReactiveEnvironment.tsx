@@ -32,6 +32,7 @@ export function ReactiveEnvironment({ motion, status }: {
   const interactions = useMemo(() => new WorldInteractions(), []);
   const surfaces = useMemo(() => createLandscapeMaterials(interactions), [interactions]);
   const liveUniforms = useRef<THREE.ShaderMaterial["uniforms"] | null>(null);
+  const ground = useRef<THREE.Mesh>(null);
   useLayoutEffect(() => { liveUniforms.current = surfaces.terrain.uniforms; }, [surfaces]);
   // Shared primitive materials are manually owned; R3F owns the mesh buffers.
   useEffect(() => () => Object.values(surfaces).forEach(surface => surface.dispose()), [surfaces]);
@@ -67,12 +68,15 @@ export function ReactiveEnvironment({ motion, status }: {
       updateLightingUniforms(live as ReturnType<typeof createLightingUniforms>, world);
       const dpr = gl.getPixelRatio();
       live.uResolution.value.set(size.width * dpr, size.height * dpr);
+      // Faded out (finish, results) or not yet born (radius ≤ 0): every fragment would be
+      // exactly the page color, which the scene background already is. Skip the draw.
+      if (ground.current) ground.current.visible = world.visibility > 0 && genesis.value.x > 0;
     }
   }, -0.5);
 
   return (
     <group name="PaceLandscape">
-      <mesh name="ContinuousTerrain" frustumCulled={false}>
+      <mesh ref={ground} name="ContinuousTerrain" frustumCulled={false}>
         {/* R3F owns and disposes these declarative resources. */}
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[terrain.positions, 3]} />

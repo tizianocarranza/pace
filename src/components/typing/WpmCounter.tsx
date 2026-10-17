@@ -309,6 +309,30 @@ export function WpmCounter({ wpm, intensity, className }: WpmCounterProps) {
     wake.current();
   }, [tuning.replay]);
 
+  // Chrome compiles the cloud filter's GPU shaders the first time it paints (~70 ms on
+  // D3D11), and the cloud first paints on the first keystroke. While the UI is still hidden
+  // for the intro, paint the same filter once, outside the hidden wrapper, at an
+  // imperceptible opacity; filter references resolve across the document's SVGs.
+  useLayoutEffect(() => {
+    const NS = "http://www.w3.org/2000/svg";
+    const warm = document.createElementNS(NS, "svg");
+    warm.setAttribute("aria-hidden", "true");
+    warm.setAttribute("viewBox", "0 0 100 100");
+    warm.setAttribute("class", "wpm-orb-svg");
+    warm.style.cssText = "position:fixed;left:0;top:0;width:88px;height:88px;opacity:0.002;pointer-events:none";
+    const lit = warm.appendChild(document.createElementNS(NS, "g"));
+    lit.setAttribute("class", "wpm-orb-lit");
+    const body = lit.appendChild(document.createElementNS(NS, "rect"));
+    body.setAttribute("x", "-10"); body.setAttribute("y", "6");
+    body.setAttribute("width", "120"); body.setAttribute("height", "94");
+    body.setAttribute("filter", `url(#${id}-cloud)`);
+    body.setAttribute("fill", `url(#${id}-tint)`);
+    document.body.appendChild(warm);
+    // Two frames in, at least one has been painted.
+    let frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => warm.remove()); });
+    return () => { cancelAnimationFrame(frame); warm.remove(); };
+  }, [id]);
+
   const tuningStyle = {
     "--orb-cloud-max": tuning.cloudOpacity,
     "--orb-drift-front": `${tuning.driftFrontSeconds}s`,

@@ -42,7 +42,10 @@ export function usePipReflection(scene: THREE.Group) {
       if (reflected) return reflected;
       const style = REFLECTED[name];
       reflected = new THREE.MeshBasicMaterial({ name: `${name} / reflection`, color: style.color,
-        transparent: true, opacity: style.opacity, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+        transparent: true, opacity: style.opacity, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+        // Both faces in one draw: flattened onto the floor in a single color, their blend
+        // order changes nothing, so three's separate back-face pass only doubled the cost.
+        forceSinglePass: true });
       reflected.userData.source = name;
       reflections.current.push(reflected);
       reflected.onBeforeCompile = shader => {
