@@ -48,11 +48,29 @@ assert.equal(progress.average, 55);
 assert.equal(recordRun(storage, run(4, 60)).isBest, false);
 
 // Cap and recent window.
-for (let i = 5; i < 80; i++) recordRun(storage, run(i, 40 + (i % 7)));
-assert.equal(loadRuns(storage).length, 50);
-progress = recordRun(storage, run(100, 45));
+for (let i = 5; i < 200; i++) recordRun(storage, run(i, 40 + (i % 7)));
+assert.equal(loadRuns(storage).length, 150);
+progress = recordRun(storage, run(300, 45));
 assert.equal(progress.recent.length, 10);
-assert.equal(progress.recent.at(-1).at, 100);
+assert.equal(progress.recent.at(-1).at, 300);
+
+// Modes compare only with themselves; runs saved without a mode are English short.
+const modes = memory();
+const inMode = (at, wpm, mode) => ({ ...run(at, wpm), mode });
+recordRun(modes, run(1, 80));
+recordRun(modes, inMode(2, 40, 'es:long'));
+progress = recordRun(modes, inMode(3, 70, 'en:short'));
+assert.equal(progress.previousBest, 80);
+assert.deepEqual(progress.recent.map(r => r.at), [1, 3]);
+progress = recordRun(modes, inMode(4, 50, 'es:long'));
+assert.equal(progress.previousBest, 40);
+assert.equal(progress.average, 40);
+assert.equal(progress.isBest, true);
+assert.deepEqual(progress.recent.map(r => r.at), [2, 4]);
+assert.equal(recordRun(modes, inMode(5, 30, 'es:short')).previousBest, null);
+assert.equal(loadRuns(modes).length, 5);
+modes.setItem(RUNS_KEY, JSON.stringify([inMode(1, 40, 7)]));
+assert.equal(loadRuns(modes).length, 0);
 
 // Corrupt or foreign data reads as empty; invalid entries are dropped.
 const corrupt = memory();
