@@ -1,21 +1,34 @@
 "use client";
 
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTypingEngine } from "@/hooks/useTypingEngine";
 import { Results } from "@/components/results/Results";
 import { Runner, type RunnerInput } from "@/components/runner/Runner";
 import { GenesisStage } from "@/components/runner/GenesisStage";
 import { CelestialToggle } from "@/components/CelestialToggle";
+import { ModePicker } from "@/components/ModePicker";
 import { TypingText } from "@/components/typing/TypingText";
 import { WpmCounter } from "@/components/typing/WpmCounter";
-import { getRandomPrompt, PROMPTS } from "@/data/prompts";
+import { pickPrompt, promptsFor } from "@/data/prompts";
+import { DEFAULT_MODE, runMode, type RunMode } from "@/lib/runMode";
 import { resolveVisualSpeed } from "@/lib/visualSpeed";
 
 const WpmSimulator = process.env.NODE_ENV === "development"
   ? lazy(() => import("@/components/debug/WpmSimulator")) : null;
 
+const serverMode = () => DEFAULT_MODE;
+/** Prompts played lately, across modes; the next pick avoids them. */
+const RECENT_PROMPTS = 12;
+
+type Prompt = { text: string; mode: RunMode };
+
 export default function Home() {
-  const [text, setText] = useState<string>(PROMPTS[0]);
+  const mode = useSyncExternalStore(runMode.subscribe, runMode.get, serverMode);
+  // Until the first pick, the mode's first prompt: the same on the server and the client.
+  const [picked, setPicked] = useState<Prompt | null>(null);
+  const prompt = picked ?? { text: promptsFor(mode)[0], mode };
+  const text = prompt.text;
+  const recentPrompts = useRef<string[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [simulatedWpm, setSimulatedWpm] = useState<number | null>(null);
   const [introReplay, setIntroReplay] = useState(0);
@@ -49,6 +62,8 @@ export default function Home() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // Space or Enter on a focused control presses it; it is not typing.
+      if (event.target instanceof Element && event.target.closest("button, a")) return;
       handleKey(event.key);
     };
 
@@ -59,23 +74,41 @@ export default function Home() {
     };
   }, [handleKey]);
 
+  const nextPrompt = (nextMode: RunMode): Prompt => {
+    recentPrompts.current = [...recentPrompts.current, text].slice(-RECENT_PROMPTS);
+    return { text: pickPrompt(nextMode, recentPrompts.current), mode: nextMode };
+  };
+
   const handleTryAgain = () => {
     setShowResults(false);
-    setText((currentText) => getRandomPrompt(currentText));
+    setPicked(nextPrompt(mode));
     reset();
+  };
+
+  const handleModeChange = (nextMode: RunMode) => {
+    runMode.choose(nextMode);
+    if (status === "idle") {
+      setPicked(nextPrompt(nextMode));
+      reset();
+    } else {
+      // A finished run keeps its prompt and mode; the next one uses the new mode.
+      setPicked(prompt);
+    }
   };
 
   return (
     <main className="isolate grid min-h-screen grid-rows-[auto_1fr_1fr] bg-[var(--page)] px-12 py-8 text-[var(--ink)] transition-colors duration-[600ms] max-sm:px-6 max-sm:py-6">
       <GenesisStage />
       <CelestialToggle />
-      <header data-genesis-reveal className="flex items-center justify-between">
+      <header data-genesis-reveal className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-sm:grid-cols-2 max-sm:gap-y-3">
         <span className="text-base font-medium tracking-[-0.04em]">pace.</span>
+        <ModePicker mode={mode} onChange={handleModeChange} disabled={status === "running"}
+          className="max-sm:col-span-2 max-sm:row-start-2 max-sm:justify-self-center" />
         <a
           href="https://github.com/tizianocarranza"
           target="_blank"
           rel="noreferrer"
-          className="text-xs tracking-[0.02em] text-[var(--muted)] transition-colors duration-300 hover:text-[var(--ink)] focus-visible:text-[var(--ink)]"
+          className="justify-self-end text-xs tracking-[0.02em] text-[var(--muted)] transition-colors duration-300 hover:text-[var(--ink)] focus-visible:text-[var(--ink)]"
         >
           by Tiziano Carranza
         </a>
@@ -86,6 +119,7 @@ export default function Home() {
           <TypingText
             key={text}
             text={text}
+            lang={prompt.mode.language}
             currentIndex={currentIndex}
             errorCount={errorCount}
             status={status}
@@ -93,7 +127,7 @@ export default function Home() {
             className="w-[min(48rem,80vw)] text-center text-[clamp(1.6rem,2.5vw,2.75rem)] leading-[1.3] font-normal tracking-[-0.035em]"
           />
         ) : (
-          summary && <Results summary={summary} onTryAgain={handleTryAgain} />
+          summary && <Results summary={summary} mode={prompt.mode} onTryAgain={handleTryAgain} />
         )}
       </section>
 

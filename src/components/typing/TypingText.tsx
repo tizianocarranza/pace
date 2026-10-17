@@ -9,6 +9,8 @@ const approvedColor = () => APPROVED_TYPED_COLOR;
 
 type TypingTextProps = {
   text: string;
+  /** The prompt's language, for screen readers and hyphenation. */
+  lang?: string;
   currentIndex: number;
   errorCount: number;
   status: "idle" | "running" | "finished";
@@ -60,7 +62,7 @@ function tokenize(text: string) {
  * The prompt. Mount it with `key={text}` so a new prompt replays its entrance
  * and the caret is placed without gliding in from the previous position.
  */
-export function TypingText({ text, currentIndex, errorCount, status, intensity, className }: TypingTextProps) {
+export function TypingText({ text, lang, currentIndex, errorCount, status, intensity, className }: TypingTextProps) {
   const containerRef = useRef<HTMLParagraphElement>(null);
   const caretRef = useRef<HTMLSpanElement>(null);
   const tokens = useMemo(() => tokenize(text), [text]);
@@ -205,6 +207,7 @@ export function TypingText({ text, currentIndex, errorCount, status, intensity, 
     <p
       ref={containerRef}
       aria-label={text}
+      lang={lang}
       data-error-style={style}
       data-typed-color={color}
       className={`typing-text relative whitespace-pre-wrap ${finished ? "text-exit" : ""} ${className ?? ""}`}

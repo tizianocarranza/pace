@@ -15,7 +15,10 @@ Stack: Next 16 (App Router, read AGENTS.md), React 19, @react-three/fiber 9,
 - `src/hooks/useTypingEngine.ts` — the only owner of real statistics (WPM, accuracy, errors);
   the formulas are pure functions in `src/lib/typingStats.ts`.
 - `src/components/results/` — results screen (chart, stats); `src/lib/runHistory.ts` keeps
-  past runs in `localStorage` for best/average/history.
+  past runs in `localStorage` for best/average/history, compared per run mode.
+- `src/lib/runMode.ts` — run mode (prompt language × length) picked in the header
+  (`ModePicker`); `src/data/prompts.ts` holds the prompts, whose length tier is read from
+  their character count (`scripts/check-prompts.mjs` validates bounds and characters).
 - `src/lib/visualSpeed.ts` — the single WPM → visual intensity curve.
 - `src/lib/theme.ts` — day/night theme on `<html data-theme>` (head script); toggled by
   clicking the sun/moon in the sky (`CelestialToggle` over `environment/SkyBodies`); the
