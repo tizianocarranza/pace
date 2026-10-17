@@ -5,10 +5,17 @@ import { THEME_SCRIPT } from "@/lib/theme";
 
 const instrumentSans = Instrument_Sans({ subsets: ["latin"] });
 
+// Absolute URLs for the share cards: the production domain on Vercel, else local.
+const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Pace — Typing in Motion",
   description:
     "A minimalist typing game that turns your typing speed into motion.",
+  openGraph: { siteName: "pace.", type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

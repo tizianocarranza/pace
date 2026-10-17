@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# pace.
 
-## Getting Started
+A minimalist typing game. You type a prompt; Pip, a small rigged character, runs through
+a procedural 3D landscape whose speed and light follow your typing speed. When you finish,
+Pip runs off screen and your results appear.
 
-First, run the development server:
+- **Modes**: short, medium or long prompts, in English or Spanish. Best, average and
+  history compare only runs of the same mode, and are kept in your browser.
+- **Results**: WPM, its curve over the run, accuracy, time, peak and consistency.
+- **Share**: every result has its own link (`/r/72-98-en-short`) with a generated card.
+- **Day and night**: click the sun or the moon in the sky.
+- **Touch screens**: tap the prompt to open the keyboard.
+- Respects `prefers-reduced-motion`.
+
+## Stack
+
+Next.js 16 (App Router), React 19, three.js with @react-three/fiber and drei, Tailwind 4,
+TypeScript. No physics engine, no animation library for the world: motion is analytic and
+shading is custom GLSL.
+
+## Run it
+
+Uses pnpm (`pnpm-lock.yaml`).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+pnpm dev        # http://localhost:3000
+pnpm build && pnpm start
+pnpm lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+In development a "Pace Debug" panel (top right) simulates typing speeds, replays the
+intro and switches experimental styles. It does not exist in production builds.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Checks
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Node checks run without a browser:
 
-## Learn More
+| Script | Covers |
+|---|---|
+| `node scripts/check-typing-stats.mjs` | WPM, accuracy and run summary formulas |
+| `node scripts/check-run-history.mjs` | saved runs, best/average/history per mode |
+| `node scripts/check-prompts.mjs` | prompt lengths, characters, picking without repeats |
+| `node scripts/check-share-result.mjs` | share links |
+| `node scripts/check-visual-speed.mjs` | the WPM → visual intensity curve |
+| `node scripts/check-pip-motion.mjs` | Pip's motion against the real GLB |
+| `node scripts/check-environment.mjs` | terrain, world motion and render budgets |
 
-To learn more about Next.js, take a look at the following resources:
+With `pnpm dev` running and Chrome installed, `scripts/review-composition.mjs` captures
+clock-stepped screenshots (`--mobile`, `--night`, `--quick`, `--wpm=N`, `--mode=es:long`)
+and `scripts/review-perf.mjs` measures frame times. Output goes to `assets/reviews/`,
+which is Git-ignored.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Deployed on Vercel with the default Next.js settings. Share cards build absolute URLs
+from `VERCEL_PROJECT_PRODUCTION_URL`, which Vercel sets; elsewhere they fall back to
+`http://localhost:3000`.
 
-## Deploy on Vercel
+## Where things live
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `src/app/page.tsx`: the game shell and keyboard input.
+- `src/hooks/useTypingEngine.ts` and `src/lib/typingStats.ts`: all statistics.
+- `src/data/prompts.ts`, `src/lib/runMode.ts`: prompts and modes.
+- `src/components/results/`, `src/lib/runHistory.ts`: results and saved runs.
+- `src/app/r/[result]/`, `src/app/_og/`: share page and cards.
+- `src/components/runner/`: the 3D scene and Pip; the world is described in
+  `src/components/runner/environment/README.md`.

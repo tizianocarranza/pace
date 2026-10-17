@@ -19,6 +19,10 @@ Stack: Next 16 (App Router, read AGENTS.md), React 19, @react-three/fiber 9,
 - `src/lib/runMode.ts` — run mode (prompt language × length) picked in the header
   (`ModePicker`); `src/data/prompts.ts` holds the prompts, whose length tier is read from
   their character count (`scripts/check-prompts.mjs` validates bounds and characters).
+- `src/app/r/[result]/` — share page for a result encoded in the path
+  (`src/lib/shareResult.ts`); `src/app/_og/card.tsx` draws the share cards (site and
+  result) with TTF copies of the UI fonts and a crop of the world (`_og/world.jpg`).
+- Package manager is pnpm (`pnpm-lock.yaml`).
 - `src/lib/visualSpeed.ts` — the single WPM → visual intensity curve.
 - `src/lib/theme.ts` — day/night theme on `<html data-theme>` (head script); toggled by
   clicking the sun/moon in the sky (`CelestialToggle` over `environment/SkyBodies`); the
