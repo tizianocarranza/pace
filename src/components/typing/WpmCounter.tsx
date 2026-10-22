@@ -359,8 +359,8 @@ export function WpmCounter({ wpm, intensity, className }: WpmCounterProps) {
             </clipPath>
             {/* No outline: the sphere is a faint lavender edge feathering into clear glass. */}
             <radialGradient id={glass} cx="50" cy="50" r={RADIUS} gradientUnits="userSpaceOnUse">
-              <stop offset="0.55" style={{ stopColor: "var(--pending)" }} stopOpacity="0" />
-              <stop offset="1" style={{ stopColor: "var(--pending)" }} stopOpacity={tuning.glassEdge} />
+              <stop offset="0.55" style={{ stopColor: "var(--orb-glass)" }} stopOpacity="0" />
+              <stop offset="1" style={{ stopColor: "var(--orb-glass)" }} stopOpacity={tuning.glassEdge} />
             </radialGradient>
             {/* Pale, airy palette in each layer's own space: near-white lavender on top. */}
             <linearGradient id={tint} gradientUnits="userSpaceOnUse" x1="0" y1="-12" x2="0" y2="90">
