@@ -120,7 +120,7 @@ html[data-theme="night"] {
 }
 
 .char {
-  transition: color 180ms var(--ease-out);
+  transition: color 100ms var(--ease-out);
 }
 
 .char-pending {
@@ -150,7 +150,7 @@ html[data-theme="night"] {
 
 .char-typed {
   color: var(--typed);
-  animation: char-settle 450ms ease-out backwards;
+  animation: char-settle 200ms ease-out backwards;
 }
 
 .char-error {
