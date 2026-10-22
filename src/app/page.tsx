@@ -127,7 +127,7 @@ export default function Home() {
               errorCount={errorCount}
               status={status}
               intensity={visualSpeed.intensity}
-              className="w-[min(48rem,80vw)] text-center text-[clamp(1.6rem,2.5vw,2.75rem)] leading-[1.3] font-normal tracking-[-0.035em]"
+              className="w-[min(80vw,max(48rem,60vw),72rem)] font-[family-name:var(--font-prompt)] text-center text-[clamp(1.6rem,2.5vw,2.75rem)] leading-[1.5] font-normal tracking-[0.03em] [word-spacing:0.18em]"
             />
             <TouchInput onKey={handleKey} active={status !== "finished"} idle={status === "idle"} />
           </div>

@@ -176,10 +176,12 @@ export function TypingText({ text, lang, currentIndex, errorCount, status, inten
         top += node.offsetTop;
       }
 
-      // Underline the current letter, taking that letter's width.
+      // Underline the current letter, taking that letter's width without the
+      // trailing letter-spacing each inline-block letter carries.
+      const spacing = parseFloat(getComputedStyle(container).letterSpacing) || 0;
       m.tx = left;
       m.ty = top + target.offsetHeight * 0.9;
-      m.tw = target.offsetWidth;
+      m.tw = target.offsetWidth - spacing;
 
       if (!m.placed || m.reduced) {
         // First placement (and reduced motion) jumps straight into position.
