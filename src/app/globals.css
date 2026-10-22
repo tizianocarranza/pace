@@ -86,6 +86,7 @@ body {
   --typed-from: #7a68e6;
   --typed-to: #3f66d8;
   --orb-digit-empty: #b3acdf;
+  --orb-glass: #c9c5e3;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -106,6 +107,8 @@ html[data-theme="night"] {
   --typed-from: #b6a8ff;
   --typed-to: #7fa0ff;
   --orb-digit-empty: #5c6699;
+  /* Brighter than --pending, so the glass edge still reads on the dark page. */
+  --orb-glass: #5c6699;
 }
 
 /* Typing prompt */

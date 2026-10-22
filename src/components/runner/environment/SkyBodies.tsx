@@ -12,6 +12,8 @@ import { worldTone } from "./worldTone";
 
 /** How far (CSS px) a body travels along its arc when it sets or rises. */
 const ARC = 90;
+/** Radians per second the surfaces turn: slow enough to read as drift, not rotation. */
+const SPIN_RATE = 0.025;
 const anchor: CelestialAnchor = { x: 0, y: 0, size: 0 };
 
 function createBody(fragmentShader: string) {
@@ -22,10 +24,18 @@ function createBody(fragmentShader: string) {
       uViewport: { value: new THREE.Vector2(1, 1) },
       uAlpha: { value: 0 },
       uGlow: { value: 1 },
+      uTime: { value: 0 },
+      uSpin: { value: 0 },
     },
     vertexShader: celestialVertex, fragmentShader,
     transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
   });
+}
+
+/** Advances one body's surface: the sun's boiling and the drift of both across the sphere. */
+function turn(material: THREE.ShaderMaterial, time: number) {
+  material.uniforms.uTime.value = time;
+  material.uniforms.uSpin.value = time * SPIN_RATE;
 }
 
 /** Writes one body's place on its arc: `away` 0 is home, 1 is set below the horizon. Setting
@@ -54,7 +64,7 @@ export function SkyBodies() {
   useEffect(() => () => { geometry.dispose(); materials.sun.dispose(); materials.moon.dispose(); },
     [geometry, materials]);
 
-  const motion = useRef({ swap: 0, hover: 0, reduced: false });
+  const motion = useRef({ swap: 0, hover: 0, time: 0, reduced: false });
   useLayoutEffect(() => {
     motion.current.swap = theme.get() === "night" ? 1 : 0;
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -72,6 +82,10 @@ export function SkyBodies() {
     m.swap = m.reduced ? goal : THREE.MathUtils.damp(m.swap, goal, 3.5, dt);
     if (Math.abs(m.swap - goal) < 0.001) m.swap = goal;
     m.hover = THREE.MathUtils.damp(m.hover, celestialHover.value, 10, dt);
+    // The surfaces boil and turn; reduced motion freezes them where they are.
+    if (!m.reduced) m.time += dt;
+    turn(materials.sun, m.time);
+    turn(materials.moon, m.time);
 
     celestialAnchor(size.width, anchor);
     // Hidden until the first arrival; while the big bang expands, it appears as the page's
